@@ -682,6 +682,10 @@ else
 KBUILD_CFLAGS   += -O3
 endif
 
+ifdef CONFIG_LTO_CLANG
+KBUILD_CFLAG	+= -fwhole-program-vtables
+endif
+
 ifdef CONFIG_LLVM_POLLY
 KBUILD_CFLAGS	+= -mllvm -polly \
 		   -mllvm -polly-run-dce \
@@ -696,6 +700,7 @@ endif
 ifdef CONFIG_INLINE_OPTIMIZATION
 KBUILD_CFLAGS	+= -mllvm -inline-threshold=600
 KBUILD_CFLAGS	+= -mllvm -inlinehint-threshold=750
+KBUILD_LDFLAGS  += --plugin-opt=-import-instr-limit=40
 endif
 
 # Tell gcc to never replace conditional load with a non-conditional one
