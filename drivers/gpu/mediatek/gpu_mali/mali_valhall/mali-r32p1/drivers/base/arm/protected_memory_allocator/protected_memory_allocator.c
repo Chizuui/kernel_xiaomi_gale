@@ -27,7 +27,7 @@
 #include <linux/slab.h>
 #include <linux/mm.h>
 #include <linux/io.h>
-#include <linux/protected_memory_allocator.h>
+#include "protected_memory_allocator.h"
 
 /* Size of a bitfield element in bytes */
 #define BITFIELD_ELEM_SIZE sizeof(u64)
