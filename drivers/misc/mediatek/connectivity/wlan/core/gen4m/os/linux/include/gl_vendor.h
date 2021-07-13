@@ -562,11 +562,24 @@ extern const struct nla_policy nla_get_apf_policy[
 
 #endif
 
+/* Compatibility wrappers for kernels < 5.10 that lack the netlink strictness
+ * validation series. On 4.19, nla_parse_nested() and nla_parse() already
+ * behave as the "deprecated" (non-strict) variants, so we just alias them.
+ * This keeps gl_vendor.h in sync with newer trees without breaking the build.
+ */
 #if KERNEL_VERSION(4, 12, 0) <= CFG80211_VERSION_CODE
+#ifndef nla_parse_nested_deprecated
+#define nla_parse_nested_deprecated(tb, maxtype, nla, policy, extack) \
+	nla_parse_nested(tb, maxtype, nla, policy, extack)
+#endif
+#ifndef nla_parse_deprecated
+#define nla_parse_deprecated(tb, maxtype, head, len, policy, extack) \
+	nla_parse(tb, maxtype, head, len, policy, extack)
+#endif
 #define NLA_PARSE_NESTED(nlattr, maxtype, nla, policy)	\
-	nla_parse_nested(nlattr, maxtype, nla, policy, NULL)
+	nla_parse_nested_deprecated(nlattr, maxtype, nla, policy, NULL)
 #define NLA_PARSE(tb, maxtype, head, len, policy) \
-	nla_parse(tb, maxtype, head, len, policy, NULL)
+	nla_parse_deprecated(tb, maxtype, head, len, policy, NULL)
 #else
 #define NLA_PARSE_NESTED(nlattr, maxtype, nla, policy)	\
 	nla_parse_nested(nlattr, maxtype, nla, policy)
