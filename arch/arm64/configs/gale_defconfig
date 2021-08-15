@@ -4,6 +4,7 @@ CONFIG_I2C_CHARDEV=y
 ### 2023.6.13 chengyuan@longcheer.com HTH-297468  Enable last_kmsg and last_logcat support __S ###
 CONFIG_CMDLINE_EXTEND=y
 ### 2023.6.13 chengyuan@longcheer.com HTH-297468  Enable last_kmsg and last_logcat support __E ###
+CONFIG_TOOLS_SUPPORT_RELR=y
 CONFIG_PREEMPT=y
 CONFIG_IKHEADERS=y
 ### 2023.6.13 chengyuan@longcheer.com HTH-297301  En-large kernel log buffer size __S ###
