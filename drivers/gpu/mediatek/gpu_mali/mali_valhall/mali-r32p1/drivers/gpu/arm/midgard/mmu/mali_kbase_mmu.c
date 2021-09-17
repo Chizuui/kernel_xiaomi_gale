@@ -173,13 +173,12 @@ static void kbase_mmu_free_pgds_list(struct kbase_device *kbdev, struct kbase_mm
 				     struct list_head *free_pgds_list)
 {
 	struct page *page, *next_page;
-
-	mutex_lock(&mmut->mmu_lock);
+	rt_mutex_lock(&mmut->mmu_lock);
 	list_for_each_entry_safe(page, next_page, free_pgds_list, lru) {
 		list_del_init(&page->lru);
 		kbase_mmu_free_pgd(kbdev, mmut, page_to_phys(page));
 	}
-	mutex_unlock(&mmut->mmu_lock);
+	rt_mutex_unlock(&mmut->mmu_lock);
 }
 
 /**
@@ -1342,7 +1341,7 @@ int kbase_mmu_insert_single_page(struct kbase_context *kctx, u64 vpfn,
 	if (nr == 0)
 		return 0;
 
-	mutex_lock(&kctx->mmu.mmu_lock);
+	rt_mutex_lock(&kctx->mmu.mmu_lock);
 
 	while (remain) {
 		unsigned int i;
@@ -1369,7 +1368,7 @@ int kbase_mmu_insert_single_page(struct kbase_context *kctx, u64 vpfn,
 			/* Fill the memory pool with enough pages for
 			 * the page walk to succeed
 			 */
-			mutex_unlock(&kctx->mmu.mmu_lock);
+			rt_mutex_unlock(&kctx->mmu.mmu_lock);
 			err = kbase_mem_pool_grow(
 #ifdef CONFIG_MALI_2MB_ALLOC
 				&kbdev->mem_pools.large[
@@ -1378,7 +1377,7 @@ int kbase_mmu_insert_single_page(struct kbase_context *kctx, u64 vpfn,
 #endif
 					kctx->mmu.group_id],
 				MIDGARD_MMU_BOTTOMLEVEL);
-			mutex_lock(&kctx->mmu.mmu_lock);
+			rt_mutex_lock(&kctx->mmu.mmu_lock);
 		} while (!err);
 		if (err) {
 			dev_warn(kbdev->dev, "%s: mmu_get_bottom_pgd failure\n",
@@ -1443,13 +1442,13 @@ int kbase_mmu_insert_single_page(struct kbase_context *kctx, u64 vpfn,
 		recover_required = true;
 		recover_count += count;
 	}
-	mutex_unlock(&kctx->mmu.mmu_lock);
-	mmu_flush_invalidate_insert_pages(kbdev, &kctx->mmu, start_vpfn, nr);
+	rt_mutex_unlock(&kctx->mmu.mmu_lock);
+    mmu_flush_invalidate_insert_pages(kbdev, &kctx->mmu, start_vpfn, nr);
 	return 0;
 
 fail_unlock:
-	mutex_unlock(&kctx->mmu.mmu_lock);
-	mmu_flush_invalidate_insert_pages(kbdev, &kctx->mmu, start_vpfn, nr);
+	rt_mutex_unlock(&kctx->mmu.mmu_lock);
+    mmu_flush_invalidate_insert_pages(kbdev, &kctx->mmu, start_vpfn, nr);
 	kbase_mmu_free_pgds_list(kbdev, &kctx->mmu, &free_pgds_list);
 	return err;
 }
@@ -1490,7 +1489,7 @@ int kbase_mmu_insert_pages_no_flush(struct kbase_device *kbdev,
 	if (nr == 0)
 		return 0;
 
-	mutex_lock(&mmut->mmu_lock);
+	rt_mutex_lock(&mmut->mmu_lock);
 
 	while (remain) {
 		unsigned int i;
@@ -1531,7 +1530,7 @@ int kbase_mmu_insert_pages_no_flush(struct kbase_device *kbdev,
 			/* Fill the memory pool with enough pages for
 			 * the page walk to succeed
 			 */
-			mutex_unlock(&mmut->mmu_lock);
+			rt_mutex_unlock(&mmut->mmu_lock);
 			err = kbase_mem_pool_grow(
 #ifdef CONFIG_MALI_2MB_ALLOC
 				&kbdev->mem_pools.large[mmut->group_id],
@@ -1539,7 +1538,7 @@ int kbase_mmu_insert_pages_no_flush(struct kbase_device *kbdev,
 				&kbdev->mem_pools.small[mmut->group_id],
 #endif
 				cur_level);
-			mutex_lock(&mmut->mmu_lock);
+			rt_mutex_lock(&mmut->mmu_lock);
 		} while (!err);
 
 		if (err) {
@@ -1612,13 +1611,13 @@ int kbase_mmu_insert_pages_no_flush(struct kbase_device *kbdev,
 
 		kunmap(p);
 	}
-	mutex_unlock(&mmut->mmu_lock);
+	rt_mutex_unlock(&mmut->mmu_lock);
 
 	return 0;
 
 fail_unlock:
-	mutex_unlock(&mmut->mmu_lock);
-	mmu_flush_invalidate_insert_pages(kbdev, mmut, start_vpfn, nr);
+	rt_mutex_unlock(&mmut->mmu_lock);
+    mmu_flush_invalidate_insert_pages(kbdev, mmut, start_vpfn, nr);
 	kbase_mmu_free_pgds_list(kbdev, mmut, &free_pgds_list);
 	return err;
 }
@@ -1974,7 +1973,7 @@ int kbase_mmu_teardown_pages(struct kbase_device *kbdev,
 		return 0;
 	}
 
-	mutex_lock(&mmut->mmu_lock);
+	rt_mutex_lock(&mmut->mmu_lock);
 
 	mmu_mode = kbdev->mmu_mode;
 
@@ -2095,7 +2094,7 @@ next:
 	}
 	err = 0;
 out:
-	mutex_unlock(&mmut->mmu_lock);
+	rt_mutex_unlock(&mmut->mmu_lock);
 
 	if (mmut->kctx)
 		kbase_mmu_flush_invalidate(mmut->kctx, start_vpfn, requested_nr,
@@ -2147,7 +2146,7 @@ static int kbase_mmu_update_pages_no_flush(struct kbase_context *kctx, u64 vpfn,
 	if (nr == 0)
 		return 0;
 
-	mutex_lock(&kctx->mmu.mmu_lock);
+	rt_mutex_lock(&kctx->mmu.mmu_lock);
 
 	kbdev = kctx->kbdev;
 
@@ -2169,7 +2168,7 @@ static int kbase_mmu_update_pages_no_flush(struct kbase_context *kctx, u64 vpfn,
 			/* Fill the memory pool with enough pages for
 			 * the page walk to succeed
 			 */
-			mutex_unlock(&kctx->mmu.mmu_lock);
+			rt_mutex_unlock(&kctx->mmu.mmu_lock);
 			err = kbase_mem_pool_grow(
 #ifdef CONFIG_MALI_2MB_ALLOC
 				&kbdev->mem_pools.large[
@@ -2178,7 +2177,7 @@ static int kbase_mmu_update_pages_no_flush(struct kbase_context *kctx, u64 vpfn,
 #endif
 					kctx->mmu.group_id],
 				MIDGARD_MMU_BOTTOMLEVEL);
-			mutex_lock(&kctx->mmu.mmu_lock);
+			rt_mutex_lock(&kctx->mmu.mmu_lock);
 		} while (!err);
 		if (err) {
 			dev_warn(kbdev->dev,
@@ -2216,11 +2215,11 @@ static int kbase_mmu_update_pages_no_flush(struct kbase_context *kctx, u64 vpfn,
 		kunmap(pfn_to_page(PFN_DOWN(pgd)));
 	}
 
-	mutex_unlock(&kctx->mmu.mmu_lock);
+	rt_mutex_unlock(&kctx->mmu.mmu_lock);
 	return 0;
 
 fail_unlock:
-	mutex_unlock(&kctx->mmu.mmu_lock);
+	rt_mutex_unlock(&kctx->mmu.mmu_lock);
 	return err;
 }
 
@@ -2291,7 +2290,7 @@ int kbase_mmu_init(struct kbase_device *const kbdev,
 		return -EINVAL;
 
 	mmut->group_id = group_id;
-	mutex_init(&mmut->mmu_lock);
+	rt_mutex_init(&mmut->mmu_lock);
 	mmut->kctx = kctx;
 
 	/* Preallocate MMU depth of four pages for mmu_teardown_level to use */
@@ -2320,9 +2319,9 @@ int kbase_mmu_init(struct kbase_device *const kbdev,
 			return -ENOMEM;
 		}
 
-		mutex_lock(&mmut->mmu_lock);
+		rt_mutex_lock(&mmut->mmu_lock);
 		mmut->pgd = kbase_mmu_alloc_pgd(kbdev, mmut);
-		mutex_unlock(&mmut->mmu_lock);
+		rt_mutex_unlock(&mmut->mmu_lock);
 	}
 
 	return 0;
@@ -2335,17 +2334,16 @@ void kbase_mmu_term(struct kbase_device *kbdev, struct kbase_mmu_table *mmut)
 	     mmut->kctx->tgid, mmut->kctx->id);
 
 	if (mmut->pgd) {
-		mutex_lock(&mmut->mmu_lock);
+		rt_mutex_lock(&mmut->mmu_lock);
 		mmu_teardown_level(kbdev, mmut, mmut->pgd, MIDGARD_MMU_TOPLEVEL,
 				mmut->mmu_teardown_pages);
-		mutex_unlock(&mmut->mmu_lock);
+		rt_mutex_unlock(&mmut->mmu_lock);
 
 		if (mmut->kctx)
 			KBASE_TLSTREAM_AUX_PAGESALLOC(kbdev, mmut->kctx->id, 0);
 	}
 
 	kfree(mmut->mmu_teardown_pages);
-	mutex_destroy(&mmut->mmu_lock);
 }
 
 void kbase_mmu_as_term(struct kbase_device *kbdev, int i)
@@ -2436,7 +2434,7 @@ void *kbase_mmu_dump(struct kbase_context *kctx, int nr_pages)
 		return NULL;
 	kaddr = vmalloc_user(size_left);
 
-	mutex_lock(&kctx->mmu.mmu_lock);
+	rt_mutex_lock(&kctx->mmu.mmu_lock);
 
 	if (kaddr) {
 		u64 end_marker = 0xFFULL;
@@ -2484,12 +2482,12 @@ void *kbase_mmu_dump(struct kbase_context *kctx, int nr_pages)
 		memcpy(mmu_dump_buffer, &end_marker, sizeof(u64));
 	}
 
-	mutex_unlock(&kctx->mmu.mmu_lock);
+	rt_mutex_unlock(&kctx->mmu.mmu_lock);
 	return kaddr;
 
 fail_free:
 	vfree(kaddr);
-	mutex_unlock(&kctx->mmu.mmu_lock);
+	rt_mutex_unlock(&kctx->mmu.mmu_lock);
 	return NULL;
 }
 KBASE_EXPORT_TEST_API(kbase_mmu_dump);
