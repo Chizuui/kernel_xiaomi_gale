@@ -23,6 +23,7 @@
 #include "adsp_platform.h"
 #include "adsp_platform_driver.h"
 #include "adsp_core.h"
+#include "adsp_timesync.h"
 #include "adsp_ipi.h"
 #include "adsp_bus_monitor.h"
 
@@ -513,7 +514,7 @@ static int adsp_ap_suspend(struct device *dev)
 
 #ifdef CONFIG_MTK_TIMER_TIMESYNC
 	if (is_adsp_system_running()) {
-		timesync_to_adsp(adsp_cores[ADSP_A_ID], APTIME_FREEZE);
+		adsp_timesync_resume();
 		pr_debug("%s, time sync freeze", __func__);
 	}
 #endif
@@ -524,8 +525,8 @@ static int adsp_ap_resume(struct device *dev)
 {
 #ifdef CONFIG_MTK_TIMER_TIMESYNC
 	if (is_adsp_system_running()) {
-		timesync_to_adsp(adsp_cores[ADSP_A_ID], APTIME_UNFREEZE);
-		pr_info("%s, time sync unfreeze", __func__);
+		adsp_timesync_resume();
+		pr_debug("%s, time sync unfreeze", __func__);
 	}
 #endif
 	return 0;
