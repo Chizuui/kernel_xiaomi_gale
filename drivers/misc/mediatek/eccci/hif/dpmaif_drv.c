@@ -620,7 +620,7 @@ int drv_dpmaif_dl_all_queue_en(bool enable)
 	return 0;
 }
 
-int drv_dpmaif_dl_idle_check(void)
+unsigned int drv_dpmaif_dl_idle_check(void)
 {
 	unsigned int ret;
 
@@ -1460,7 +1460,7 @@ void drv_dpmaif_ul_all_queue_en(bool enable)
 #endif
 }
 
-int drv_dpmaif_ul_idle_check(void)
+unsigned int drv_dpmaif_ul_idle_check(void)
 {
 	unsigned long idle_sts;
 	unsigned int ret;
@@ -1470,9 +1470,10 @@ int drv_dpmaif_ul_idle_check(void)
 			DPMAIF_UL_IDLE_STS_MSK);
 
 	if (idle_sts == DPMAIF_UL_IDLE_STS)
-		ret = 0;
-	else
+		/*k4.14 ret = 0;need review*/
 		ret = 1;
+	else
+		ret = 0;
 
 	return ret;
 }
