@@ -366,6 +366,7 @@ void mdrv_DPTx_deinit(struct mtk_dp *mtk_dp)
 	mdrv_DPTx_VideoMute(mtk_dp, true);
 	mdrv_DPTx_AudioMute(mtk_dp, true);
 	mhal_DPTx_VideoMuteSW(mtk_dp, true);
+	cancel_work(&mtk_dp->hdcp_work);
 
 	mtk_dp->training_info.ucCheckCapTimes = 0;
 	mtk_dp->video_enable = false;
@@ -1457,6 +1458,8 @@ int mdrv_DPTx_HPD_HandleInThread(struct mtk_dp *mtk_dp)
 				mtk_dp->disp_status = DPTX_DISP_NONE;
 			} else
 				DPTXMSG("Skip uevent(0)\n");
+
+			cancel_work(&mtk_dp->hdcp_work);
 
 #ifdef DPTX_HDCP_ENABLE
 			if (mtk_dp->info.hdcp2_info.bEnable)
@@ -3311,14 +3314,15 @@ static int mtk_dp_conn_get_modes(struct drm_connector *conn)
 	}
 
 	if (mtk_dp->edid) {
-		drm_connector_update_edid_property(&mtk_dp->conn,
+		drm_mode_connector_update_edid_property(&mtk_dp->conn,
 			mtk_dp->edid);
 		ret = drm_add_edid_modes(&mtk_dp->conn, mtk_dp->edid);
+		drm_edid_to_eld(&mtk_dp->conn, mtk_dp->edid);
 		DPTXMSG("%s modes = %d\n", __func__, ret);
 		if (ret)
 			return ret;
 	} else {
-		drm_connector_update_edid_property(&mtk_dp->conn, NULL);
+		drm_mode_connector_update_edid_property(&mtk_dp->conn, NULL);
 		DPTXMSG("%s NULL EDID\n", __func__);
 	}
 

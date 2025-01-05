@@ -489,8 +489,6 @@ mtk_drm_crtc_duplicate_state(struct drm_crtc *crtc)
 		state->rsz_dst_roi = old_state->rsz_dst_roi;
 		state->prop_val[CRTC_PROP_DOZE_ACTIVE] =
 			old_state->prop_val[CRTC_PROP_DOZE_ACTIVE];
-		state->prop_val[CRTC_PROP_PRES_FENCE_IDX] =
-			old_state->prop_val[CRTC_PROP_PRES_FENCE_IDX];
 	}
 
 	return &state->base;
@@ -1172,15 +1170,11 @@ void mtk_crtc_prepare_dual_pipe(struct mtk_drm_crtc *mtk_crtc)
 			return;
 		}
 		if (mtk_ddp_comp_get_type(comp_id) == MTK_DISP_VIRTUAL) {
-			struct mtk_ddp_comp *comp_l;
+			struct mtk_ddp_comp *comp;
 
-			comp_l = kzalloc(sizeof(*comp_l), GFP_KERNEL);
-			if (comp_l == NULL) {
-				DDPFUNC("%s: kzalloc fail!\n", __func__);
-				continue;
-			}
-			comp_l->id = comp_id;
-			mtk_crtc->dual_pipe_ddp_ctx.ddp_comp[i][j] = comp_l;
+			comp = kzalloc(sizeof(*comp), GFP_KERNEL);
+			comp->id = comp_id;
+			mtk_crtc->dual_pipe_ddp_ctx.ddp_comp[i][j] = comp;
 			continue;
 		}
 
@@ -3679,8 +3673,7 @@ void mtk_crtc_start_trig_loop(struct drm_crtc *crtc)
 		inst = cmdq_pkt_get_va_by_offset(cmdq_handle,  inst_condi_jump);
 		jump_pa = cmdq_pkt_get_pa_by_offset(cmdq_handle,
 					cmdq_handle->cmd_buf_size);
-		if(inst)
-			*inst = *inst | CMDQ_REG_SHIFT_ADDR(jump_pa);
+		*inst = *inst | CMDQ_REG_SHIFT_ADDR(jump_pa);
 
 		cmdq_pkt_set_event(cmdq_handle,
 			mtk_crtc->gce_obj.event[EVENT_SYNC_TOKEN_SODI]);
@@ -7170,9 +7163,6 @@ void mtk_drm_fake_vsync_init(struct drm_crtc *crtc)
 		return;
 	}
 
-	if(fake_vsync == NULL)
-		return;
-
 	snprintf(name, len, "mtk_drm_fake_vsync:%d", drm_crtc_index(crtc));
 	fake_vsync->fvsync_task = kthread_create(mtk_drm_fake_vsync_kthread,
 					crtc, name);
@@ -7295,7 +7285,7 @@ int mtk_drm_crtc_create(struct drm_device *drm_dev,
 	int ret;
 	int i, j, p_mode;
 #ifdef MTK_FB_MMDVFS_SUPPORT
-	int result;
+	u32 result;
 #endif
 	enum mtk_ddp_comp_id comp_id;
 
