@@ -167,8 +167,6 @@ void mmc_request_done(struct mmc_host *host, struct mmc_request *mrq)
 
 	trace_mmc_request_done(host, mrq);
 
-	dbg_add_host_log(host, 1, cmd->opcode, cmd->resp[0]);
-
 	/*
 	 * We list various conditions for the command to be considered
 	 * properly done:
@@ -211,6 +209,8 @@ void mmc_request_done(struct mmc_host *host, struct mmc_request *mrq)
 				mrq->stop->resp[2], mrq->stop->resp[3]);
 		}
 	}
+	if(host && cmd)
+		dbg_add_host_log(host, 1, cmd->opcode, cmd->resp[0]);
 	/*
 	 * Request starter must handle retries - see
 	 * mmc_wait_for_req_done().
@@ -905,6 +905,8 @@ int mmc_run_queue_thread(void *data)
 	pr_info("[CQ] start cmdq thread\n");
 	mt_bio_queue_alloc(current, NULL, false);
 
+	set_user_nice(current, MIN_NICE);
+
 	while (1) {
 		mt_biolog_cmdq_check();
 		/* End request stage 1/2 */
@@ -1258,21 +1260,21 @@ int mmc_cqe_start_req(struct mmc_host *host, struct mmc_request *mrq)
 
 	mmc_mrq_pr_debug(host, mrq, true);
 
-	if(mrq->cmd)
-		dbg_add_host_log(host, 5, mrq->cmd->opcode, mrq->cmd->arg);
-
-	if(mrq->data){
-		if (mrq->data->flags & MMC_DATA_WRITE)
-			dbg_add_host_log(host, 5, MMC_EXECUTE_WRITE_TASK, mrq->data->blocks);//CMD47
-		else if (mrq->data->flags & MMC_DATA_READ)
-			dbg_add_host_log(host, 5, MMC_EXECUTE_READ_TASK, mrq->data->blocks);//CMD46
-	}
-
 	err = mmc_mrq_prep(host, mrq);
 	if (err)
 		goto out_err;
 
 	err = host->cqe_ops->cqe_request(host, mrq);
+
+	if(host && mrq && mrq->cmd)
+		dbg_add_host_log(host, 5, mrq->cmd->opcode, mrq->cmd->arg);
+
+	if(host && mrq && mrq->data){
+		if (mrq->data->flags & MMC_DATA_WRITE)
+			dbg_add_host_log(host, 5, MMC_EXECUTE_WRITE_TASK, mrq->data->blocks);//CMD47
+		else if (mrq->data->flags & MMC_DATA_READ)
+			dbg_add_host_log(host, 5, MMC_EXECUTE_READ_TASK, mrq->data->blocks);//CMD46
+	}
 
 	if (err)
 		goto out_err;
