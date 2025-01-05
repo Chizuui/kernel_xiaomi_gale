@@ -40,6 +40,10 @@
 
 #include "mt6358.h"
 
+#if defined(CONFIG_SND_SOC_FS15XX)
+#include "fs15xx/fs15xx.h"
+#endif
+
 enum {
 	AUDIO_ANALOG_VOLUME_HSOUTL,
 	AUDIO_ANALOG_VOLUME_HSOUTR,
@@ -1493,7 +1497,7 @@ static int mt_aif_in_event(struct snd_soc_dapm_widget *w,
 		/* sdm audio fifo clock power on */
 		regmap_write(priv->regmap, MT6358_AFUNC_AUD_CON2, 0x0006);
 		/* scrambler clock on enable, invert left channel */
-		regmap_write(priv->regmap, MT6358_AFUNC_AUD_CON0, 0xcba1);
+		regmap_write(priv->regmap, MT6358_AFUNC_AUD_CON0, 0xCFA1);
 		/* sdm power on */
 		regmap_write(priv->regmap, MT6358_AFUNC_AUD_CON2, 0x0003);
 		/* sdm fifo enable */
@@ -1502,7 +1506,7 @@ static int mt_aif_in_event(struct snd_soc_dapm_widget *w,
 	case SND_SOC_DAPM_POST_PMD:
 		/* DL scrambler disabling sequence */
 		regmap_write(priv->regmap, MT6358_AFUNC_AUD_CON2, 0x0000);
-		regmap_write(priv->regmap, MT6358_AFUNC_AUD_CON0, 0xcba0);
+		regmap_write(priv->regmap, MT6358_AFUNC_AUD_CON0, 0xCFA0);
 
 		playback_gpio_reset(priv);
 		break;
@@ -2123,8 +2127,6 @@ static int mtk_hp_dual_spk_enable(struct mt6358_priv *priv)
 {
 	unsigned int trim_setting = 0;
 	unsigned int reg_value = 0;
-	/* scrambler clock on enable, invert left channel */
-	regmap_write(priv->regmap, MT6358_AFUNC_AUD_CON0, 0xcfa1);
 #ifdef ANALOG_HPTRIM
 	regmap_read(priv->regmap, MT6358_AUDDEC_ELR_0, &reg_value);
 	dev_info(priv->dev, "%s(), current AUDDEC_ELR_0 = 0x%x, mic_vinp_mv = %d\n",
@@ -2791,8 +2793,6 @@ static int mt_rcv_event(struct snd_soc_dapm_widget *w,
 
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
-		/* scrambler clock on enable, invert left channel */
-		regmap_write(priv->regmap, MT6358_AFUNC_AUD_CON0, 0xcfa1);
 		/* Reduce ESD resistance of AU_REFN */
 		regmap_write(priv->regmap, MT6358_AUDDEC_ANA_CON2, 0x4000);
 
@@ -3502,14 +3502,6 @@ static int mt6358_vow_amic_enable(struct mt6358_priv *priv)
 		regmap_update_bits(priv->regmap, MT6358_AUDENC_ANA_CON9,
 				   0xff, 0x25);
 	}
-	/* Enable audio uplink LPW mode */
-	/* Enable Audio ADC 1st Stage LPW */
-	/* Enable Audio ADC 2nd & 3rd LPW */
-	/* Enable Audio ADC flash Audio ADC flash */
-	regmap_update_bits(priv->regmap, MT6358_AUDENC_ANA_CON2,
-			   0xC31F, 0xC31F);
-	dev_info(priv->dev, "%s(), mt_vow_aud_lpw_enable 0xC31F\n",
-		 __func__);
 	/* set mic pga gain : Audio L PGA 24 dB gain*/
 	regmap_update_bits(priv->regmap, MT6358_AUDENC_ANA_CON0,
 			   RG_AUDPREAMPLGAIN_MASK_SFT,
@@ -3555,6 +3547,14 @@ static int mt6358_vow_amic_enable(struct mt6358_priv *priv)
 				   0x1 << 12, 0x0);
 	}
 	usleep_range(1000, 1200);
+	/* Enable audio uplink LPW mode */
+	/* Enable Audio ADC 1st Stage LPW */
+	/* Enable Audio ADC 2nd & 3rd LPW */
+	/* Enable Audio ADC flash Audio ADC flash */
+	regmap_update_bits(priv->regmap, MT6358_AUDENC_ANA_CON2,
+			   0x0039, 0x0039);
+	dev_info(priv->dev, "%s(), mt_vow_aud_lpw_enable 0x39\n",
+		 __func__);
 	return 0;
 }
 
@@ -3570,7 +3570,7 @@ static int mt6358_vow_amic_disable(struct mt6358_priv *priv)
 	/* Disable Audio ADC 2nd & 3rd LPW */
 	/* Disable Audio ADC flash Audio ADC flash */
 	regmap_update_bits(priv->regmap, MT6358_AUDENC_ANA_CON2,
-			   0xC31F, 0x0000);
+			   0x0039, 0x0000);
 	dev_info(priv->dev, "%s(), mt_vow_aud_lpw_disable 0x0\n",
 		 __func__);
 	/* L ADC input sel : off, disable L ADC */
@@ -7216,6 +7216,11 @@ static int mt6358_codec_probe(struct snd_soc_component *cmpnt)
 				       mt6358_snd_vow_controls,
 				       ARRAY_SIZE(mt6358_snd_vow_controls));
 
+	// FourSemi add for kcontrol register 20230529
+#if defined(CONFIG_SND_SOC_FS15XX)
+	fs15xx_add_codec_kcontrol(cmpnt);
+#endif
+
 	mt6358_codec_init_reg(priv);
 
 	priv->ana_gain[AUDIO_ANALOG_VOLUME_HPOUTL] = 8;
@@ -7377,646 +7382,563 @@ static ssize_t mt6358_debugfs_read(struct file *file, char __user *buf,
 
 	regmap_read(priv->regmap, MT6358_DRV_CON3, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_DRV_CON3 = 0x%x\n", MT6358_DRV_CON3, value);
+		       "MT6358_DRV_CON3 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_GPIO_DIR0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_GPIO_DIR0 = 0x%x\n", MT6358_GPIO_DIR0, value);
+		       "MT6358_GPIO_DIR0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_GPIO_MODE2, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_GPIO_MODE2 = 0x%x\n", MT6358_GPIO_MODE2, value);
+		       "MT6358_GPIO_MODE2 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_GPIO_MODE3, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_GPIO_MODE3 = 0x%x\n", MT6358_GPIO_MODE3, value);
+		       "MT6358_GPIO_MODE3 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_TOP_CKPDN_CON0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_TOP_CKPDN_CON0 = 0x%x\n", MT6358_TOP_CKPDN_CON0, value);
+		       "MT6358_TOP_CKPDN_CON0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_TOP_CKHWEN_CON0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_TOP_CKHWEN_CON0 = 0x%x\n", MT6358_TOP_CKHWEN_CON0, value);
+		       "MT6358_TOP_CKHWEN_CON0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_DCXO_CW13, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_DCXO_CW13 = 0x%x\n", MT6358_DCXO_CW13, value);
+		       "MT6358_DCXO_CW13 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_DCXO_CW14, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_DCXO_CW14 = 0x%x\n", MT6358_DCXO_CW14, value);
+		       "MT6358_DCXO_CW14 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUXADC_CON10, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUXADC_CON10 = 0x%x\n", MT6358_AUXADC_CON10, value);
+		       "MT6358_AUXADC_CON10 = 0x%x\n", value);
 
 	regmap_read(priv->regmap, MT6358_AUD_TOP_ID, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUD_TOP_ID = 0x%x\n", MT6358_AUD_TOP_ID, value);
+		       "MT6358_AUD_TOP_ID = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUD_TOP_REV0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUD_TOP_REV0 = 0x%x\n", MT6358_AUD_TOP_REV0, value);
+		       "MT6358_AUD_TOP_REV0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUD_TOP_DBI, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUD_TOP_DBI = 0x%x\n", MT6358_AUD_TOP_DBI, value);
+		       "MT6358_AUD_TOP_DBI = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUD_TOP_DXI, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUD_TOP_DXI = 0x%x\n", MT6358_AUD_TOP_DXI, value);
+		       "MT6358_AUD_TOP_DXI = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUD_TOP_CKPDN_TPM0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUD_TOP_CKPDN_TPM0 = 0x%x\n",
-		       MT6358_AUD_TOP_CKPDN_TPM0, value);
+		       "MT6358_AUD_TOP_CKPDN_TPM0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUD_TOP_CKPDN_TPM1, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUD_TOP_CKPDN_TPM1 = 0x%x\n",
-		       MT6358_AUD_TOP_CKPDN_TPM1, value);
+		       "MT6358_AUD_TOP_CKPDN_TPM1 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUD_TOP_CKPDN_CON0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUD_TOP_CKPDN_CON0 = 0x%x\n",
-		       MT6358_AUD_TOP_CKPDN_CON0, value);
+		       "MT6358_AUD_TOP_CKPDN_CON0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUD_TOP_CKPDN_CON0_SET, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUD_TOP_CKPDN_CON0_SET = 0x%x\n",
-		       MT6358_AUD_TOP_CKPDN_CON0_SET, value);
+		       "MT6358_AUD_TOP_CKPDN_CON0_SET = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUD_TOP_CKPDN_CON0_CLR, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUD_TOP_CKPDN_CON0_CLR = 0x%x\n",
-		       MT6358_AUD_TOP_CKPDN_CON0_CLR, value);
+		       "MT6358_AUD_TOP_CKPDN_CON0_CLR = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUD_TOP_CKSEL_CON0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUD_TOP_CKSEL_CON0 = 0x%x\n",
-		       MT6358_AUD_TOP_CKSEL_CON0, value);
+		       "MT6358_AUD_TOP_CKSEL_CON0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUD_TOP_CKSEL_CON0_SET, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUD_TOP_CKSEL_CON0_SET = 0x%x\n",
-		       MT6358_AUD_TOP_CKSEL_CON0_SET, value);
+		       "MT6358_AUD_TOP_CKSEL_CON0_SET = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUD_TOP_CKSEL_CON0_CLR, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUD_TOP_CKSEL_CON0_CLR = 0x%x\n",
-		       MT6358_AUD_TOP_CKSEL_CON0_CLR, value);
+		       "MT6358_AUD_TOP_CKSEL_CON0_CLR = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUD_TOP_CKTST_CON0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUD_TOP_CKTST_CON0 = 0x%x\n",
-		       MT6358_AUD_TOP_CKTST_CON0, value);
+		       "MT6358_AUD_TOP_CKTST_CON0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUD_TOP_CLK_HWEN_CON0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUD_TOP_CLK_HWEN_CON0 = 0x%x\n",
-		       MT6358_AUD_TOP_CLK_HWEN_CON0, value);
+		       "MT6358_AUD_TOP_CLK_HWEN_CON0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUD_TOP_CLK_HWEN_CON0_SET, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUD_TOP_CLK_HWEN_CON0_SET = 0x%x\n",
-		       MT6358_AUD_TOP_CLK_HWEN_CON0_SET, value);
+		       "MT6358_AUD_TOP_CLK_HWEN_CON0_SET = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUD_TOP_CLK_HWEN_CON0_CLR, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUD_TOP_CLK_HWEN_CON0_CLR = 0x%x\n",
-		       MT6358_AUD_TOP_CLK_HWEN_CON0_CLR, value);
+		       "MT6358_AUD_TOP_CLK_HWEN_CON0_CLR = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUD_TOP_RST_CON0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUD_TOP_RST_CON0 = 0x%x\n", MT6358_AUD_TOP_RST_CON0, value);
+		       "MT6358_AUD_TOP_RST_CON0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUD_TOP_RST_CON0_SET, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUD_TOP_RST_CON0_SET = 0x%x\n",
-		       MT6358_AUD_TOP_RST_CON0_SET, value);
+		       "MT6358_AUD_TOP_RST_CON0_SET = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUD_TOP_RST_CON0_CLR, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUD_TOP_RST_CON0_CLR = 0x%x\n",
-		       MT6358_AUD_TOP_RST_CON0_CLR, value);
+		       "MT6358_AUD_TOP_RST_CON0_CLR = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUD_TOP_RST_BANK_CON0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUD_TOP_RST_BANK_CON0 = 0x%x\n",
-		       MT6358_AUD_TOP_RST_BANK_CON0, value);
+		       "MT6358_AUD_TOP_RST_BANK_CON0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUD_TOP_INT_CON0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUD_TOP_INT_CON0 = 0x%x\n", MT6358_AUD_TOP_INT_CON0, value);
+		       "MT6358_AUD_TOP_INT_CON0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUD_TOP_INT_CON0_SET, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUD_TOP_INT_CON0_SET = 0x%x\n",
-		       MT6358_AUD_TOP_INT_CON0_SET, value);
+		       "MT6358_AUD_TOP_INT_CON0_SET = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUD_TOP_INT_CON0_CLR, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUD_TOP_INT_CON0_CLR = 0x%x\n",
-		       MT6358_AUD_TOP_INT_CON0_CLR, value);
+		       "MT6358_AUD_TOP_INT_CON0_CLR = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUD_TOP_INT_MASK_CON0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUD_TOP_INT_MASK_CON0 = 0x%x\n",
-		       MT6358_AUD_TOP_INT_MASK_CON0, value);
+		       "MT6358_AUD_TOP_INT_MASK_CON0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUD_TOP_INT_MASK_CON0_SET, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUD_TOP_INT_MASK_CON0_SET = 0x%x\n",
-		       MT6358_AUD_TOP_INT_MASK_CON0_SET, value);
+		       "MT6358_AUD_TOP_INT_MASK_CON0_SET = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUD_TOP_INT_MASK_CON0_CLR, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUD_TOP_INT_MASK_CON0_CLR = 0x%x\n",
-		       MT6358_AUD_TOP_INT_MASK_CON0_CLR, value);
+		       "MT6358_AUD_TOP_INT_MASK_CON0_CLR = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUD_TOP_INT_STATUS0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUD_TOP_INT_STATUS0 = 0x%x\n",
-		       MT6358_AUD_TOP_INT_STATUS0, value);
+		       "MT6358_AUD_TOP_INT_STATUS0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUD_TOP_INT_RAW_STATUS0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUD_TOP_INT_RAW_STATUS0 = 0x%x\n",
-		       MT6358_AUD_TOP_INT_RAW_STATUS0, value);
+		       "MT6358_AUD_TOP_INT_RAW_STATUS0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUD_TOP_INT_MISC_CON0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUD_TOP_INT_MISC_CON0 = 0x%x\n",
-		       MT6358_AUD_TOP_INT_MISC_CON0, value);
+		       "MT6358_AUD_TOP_INT_MISC_CON0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDNCP_CLKDIV_CON0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDNCP_CLKDIV_CON0 = 0x%x\n",
-		       MT6358_AUDNCP_CLKDIV_CON0, value);
+		       "MT6358_AUDNCP_CLKDIV_CON0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDNCP_CLKDIV_CON1, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDNCP_CLKDIV_CON1 = 0x%x\n",
-		       MT6358_AUDNCP_CLKDIV_CON1, value);
+		       "MT6358_AUDNCP_CLKDIV_CON1 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDNCP_CLKDIV_CON2, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDNCP_CLKDIV_CON2 = 0x%x\n",
-		       MT6358_AUDNCP_CLKDIV_CON2, value);
+		       "MT6358_AUDNCP_CLKDIV_CON2 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDNCP_CLKDIV_CON3, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDNCP_CLKDIV_CON3 = 0x%x\n",
-		       MT6358_AUDNCP_CLKDIV_CON3, value);
+		       "MT6358_AUDNCP_CLKDIV_CON3 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDNCP_CLKDIV_CON4, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDNCP_CLKDIV_CON4 = 0x%x\n",
-		       MT6358_AUDNCP_CLKDIV_CON4, value);
+		       "MT6358_AUDNCP_CLKDIV_CON4 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUD_TOP_MON_CON0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUD_TOP_MON_CON0 = 0x%x\n", MT6358_AUD_TOP_MON_CON0, value);
+		       "MT6358_AUD_TOP_MON_CON0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDIO_DIG_DSN_ID, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDIO_DIG_DSN_ID = 0x%x\n", MT6358_AUDIO_DIG_DSN_ID, value);
+		       "MT6358_AUDIO_DIG_DSN_ID = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDIO_DIG_DSN_REV0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDIO_DIG_DSN_REV0 = 0x%x\n",
-		       MT6358_AUDIO_DIG_DSN_REV0, value);
+		       "MT6358_AUDIO_DIG_DSN_REV0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDIO_DIG_DSN_DBI, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDIO_DIG_DSN_DBI = 0x%x\n",
-		       MT6358_AUDIO_DIG_DSN_DBI, value);
+		       "MT6358_AUDIO_DIG_DSN_DBI = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDIO_DIG_DSN_DXI, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDIO_DIG_DSN_DXI = 0x%x\n",
-		       MT6358_AUDIO_DIG_DSN_DXI, value);
+		       "MT6358_AUDIO_DIG_DSN_DXI = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_UL_DL_CON0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_UL_DL_CON0 = 0x%x\n", MT6358_AFE_UL_DL_CON0, value);
+		       "MT6358_AFE_UL_DL_CON0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_DL_SRC2_CON0_L, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_DL_SRC2_CON0_L = 0x%x\n",
-		       MT6358_AFE_DL_SRC2_CON0_L, value);
+		       "MT6358_AFE_DL_SRC2_CON0_L = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_UL_SRC_CON0_H, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_UL_SRC_CON0_H = 0x%x\n",
-		       MT6358_AFE_UL_SRC_CON0_H, value);
+		       "MT6358_AFE_UL_SRC_CON0_H = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_UL_SRC_CON0_L, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_UL_SRC_CON0_L = 0x%x\n",
-		       MT6358_AFE_UL_SRC_CON0_L, value);
+		       "MT6358_AFE_UL_SRC_CON0_L = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_TOP_CON0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_TOP_CON0 = 0x%x\n", MT6358_AFE_TOP_CON0, value);
+		       "MT6358_AFE_TOP_CON0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDIO_TOP_CON0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDIO_TOP_CON0 = 0x%x\n", MT6358_AUDIO_TOP_CON0, value);
+		       "MT6358_AUDIO_TOP_CON0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_MON_DEBUG0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_MON_DEBUG0 = 0x%x\n", MT6358_AFE_MON_DEBUG0, value);
+		       "MT6358_AFE_MON_DEBUG0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFUNC_AUD_CON0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFUNC_AUD_CON0 = 0x%x\n", MT6358_AFUNC_AUD_CON0, value);
+		       "MT6358_AFUNC_AUD_CON0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFUNC_AUD_CON1, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFUNC_AUD_CON1 = 0x%x\n", MT6358_AFUNC_AUD_CON1, value);
+		       "MT6358_AFUNC_AUD_CON1 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFUNC_AUD_CON2, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFUNC_AUD_CON2 = 0x%x\n", MT6358_AFUNC_AUD_CON2, value);
+		       "MT6358_AFUNC_AUD_CON2 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFUNC_AUD_CON3, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFUNC_AUD_CON3 = 0x%x\n", MT6358_AFUNC_AUD_CON3, value);
+		       "MT6358_AFUNC_AUD_CON3 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFUNC_AUD_CON4, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFUNC_AUD_CON4 = 0x%x\n", MT6358_AFUNC_AUD_CON4, value);
+		       "MT6358_AFUNC_AUD_CON4 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFUNC_AUD_CON5, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFUNC_AUD_CON5 = 0x%x\n", MT6358_AFUNC_AUD_CON5, value);
+		       "MT6358_AFUNC_AUD_CON5 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFUNC_AUD_CON6, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFUNC_AUD_CON6 = 0x%x\n", MT6358_AFUNC_AUD_CON6, value);
+		       "MT6358_AFUNC_AUD_CON6 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFUNC_AUD_MON0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFUNC_AUD_MON0 = 0x%x\n", MT6358_AFUNC_AUD_MON0, value);
+		       "MT6358_AFUNC_AUD_MON0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDRC_TUNE_MON0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDRC_TUNE_MON0 = 0x%x\n", MT6358_AUDRC_TUNE_MON0, value);
+		       "MT6358_AUDRC_TUNE_MON0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_ADDA_MTKAIF_FIFO_CFG0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_ADDA_MTKAIF_FIFO_CFG0 = 0x%x\n",
-		       MT6358_AFE_ADDA_MTKAIF_FIFO_CFG0, value);
+		       "MT6358_AFE_ADDA_MTKAIF_FIFO_CFG0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_ADDA_MTKAIF_FIFO_LOG_MON1, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_ADDA_MTKAIF_FIFO_LOG_MON1 = 0x%x\n",
-		       MT6358_AFE_ADDA_MTKAIF_FIFO_LOG_MON1, value);
+		       "MT6358_AFE_ADDA_MTKAIF_FIFO_LOG_MON1 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_ADDA_MTKAIF_MON0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_ADDA_MTKAIF_MON0 = 0x%x\n",
-		       MT6358_AFE_ADDA_MTKAIF_MON0, value);
+		       "MT6358_AFE_ADDA_MTKAIF_MON0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_ADDA_MTKAIF_MON1, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_ADDA_MTKAIF_MON1 = 0x%x\n",
-		       MT6358_AFE_ADDA_MTKAIF_MON1, value);
+		       "MT6358_AFE_ADDA_MTKAIF_MON1 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_ADDA_MTKAIF_MON2, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_ADDA_MTKAIF_MON2 = 0x%x\n",
-		       MT6358_AFE_ADDA_MTKAIF_MON2, value);
+		       "MT6358_AFE_ADDA_MTKAIF_MON2 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_ADDA_MTKAIF_MON3, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_ADDA_MTKAIF_MON3 = 0x%x\n",
-		       MT6358_AFE_ADDA_MTKAIF_MON3, value);
+		       "MT6358_AFE_ADDA_MTKAIF_MON3 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_ADDA_MTKAIF_CFG0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_ADDA_MTKAIF_CFG0 = 0x%x\n",
-		       MT6358_AFE_ADDA_MTKAIF_CFG0, value);
+		       "MT6358_AFE_ADDA_MTKAIF_CFG0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_ADDA_MTKAIF_RX_CFG0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_ADDA_MTKAIF_RX_CFG0 = 0x%x\n",
-		       MT6358_AFE_ADDA_MTKAIF_RX_CFG0, value);
+		       "MT6358_AFE_ADDA_MTKAIF_RX_CFG0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_ADDA_MTKAIF_RX_CFG1, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_ADDA_MTKAIF_RX_CFG1 = 0x%x\n",
-		       MT6358_AFE_ADDA_MTKAIF_RX_CFG1, value);
+		       "MT6358_AFE_ADDA_MTKAIF_RX_CFG1 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_ADDA_MTKAIF_RX_CFG2, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_ADDA_MTKAIF_RX_CFG2 = 0x%x\n",
-		       MT6358_AFE_ADDA_MTKAIF_RX_CFG2, value);
+		       "MT6358_AFE_ADDA_MTKAIF_RX_CFG2 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_ADDA_MTKAIF_RX_CFG3, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_ADDA_MTKAIF_RX_CFG3 = 0x%x\n",
-		       MT6358_AFE_ADDA_MTKAIF_RX_CFG3, value);
+		       "MT6358_AFE_ADDA_MTKAIF_RX_CFG3 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_ADDA_MTKAIF_TX_CFG1, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_ADDA_MTKAIF_TX_CFG1 = 0x%x\n",
-		       MT6358_AFE_ADDA_MTKAIF_TX_CFG1, value);
+		       "MT6358_AFE_ADDA_MTKAIF_TX_CFG1 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_SGEN_CFG0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_SGEN_CFG0 = 0x%x\n", MT6358_AFE_SGEN_CFG0, value);
+		       "MT6358_AFE_SGEN_CFG0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_SGEN_CFG1, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_SGEN_CFG1 = 0x%x\n", MT6358_AFE_SGEN_CFG1, value);
+		       "MT6358_AFE_SGEN_CFG1 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_ADC_ASYNC_FIFO_CFG, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_ADC_ASYNC_FIFO_CFG = 0x%x\n",
-		       MT6358_AFE_ADC_ASYNC_FIFO_CFG, value);
+		       "MT6358_AFE_ADC_ASYNC_FIFO_CFG = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_DCCLK_CFG0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_DCCLK_CFG0 = 0x%x\n", MT6358_AFE_DCCLK_CFG0, value);
+		       "MT6358_AFE_DCCLK_CFG0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_DCCLK_CFG1, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_DCCLK_CFG1 = 0x%x\n", MT6358_AFE_DCCLK_CFG1, value);
+		       "MT6358_AFE_DCCLK_CFG1 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDIO_DIG_CFG, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDIO_DIG_CFG = 0x%x\n", MT6358_AUDIO_DIG_CFG, value);
+		       "MT6358_AUDIO_DIG_CFG = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_AUD_PAD_TOP, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_AUD_PAD_TOP = 0x%x\n", MT6358_AFE_AUD_PAD_TOP, value);
+		       "MT6358_AFE_AUD_PAD_TOP = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_AUD_PAD_TOP_MON, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_AUD_PAD_TOP_MON = 0x%x\n",
-		       MT6358_AFE_AUD_PAD_TOP_MON, value);
+		       "MT6358_AFE_AUD_PAD_TOP_MON = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_AUD_PAD_TOP_MON1, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_AUD_PAD_TOP_MON1 = 0x%x\n",
-		       MT6358_AFE_AUD_PAD_TOP_MON1, value);
+		       "MT6358_AFE_AUD_PAD_TOP_MON1 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_DL_NLE_CFG, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_DL_NLE_CFG = 0x%x\n", MT6358_AFE_DL_NLE_CFG, value);
+		       "MT6358_AFE_DL_NLE_CFG = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_DL_NLE_MON, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_DL_NLE_MON = 0x%x\n", MT6358_AFE_DL_NLE_MON, value);
+		       "MT6358_AFE_DL_NLE_MON = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_CG_EN_MON, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_CG_EN_MON = 0x%x\n", MT6358_AFE_CG_EN_MON, value);
+		       "MT6358_AFE_CG_EN_MON = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDIO_DIG_2ND_DSN_ID, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDIO_DIG_2ND_DSN_ID = 0x%x\n",
-		       MT6358_AUDIO_DIG_2ND_DSN_ID, value);
+		       "MT6358_AUDIO_DIG_2ND_DSN_ID = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDIO_DIG_2ND_DSN_REV0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDIO_DIG_2ND_DSN_REV0 = 0x%x\n",
-		       MT6358_AUDIO_DIG_2ND_DSN_REV0, value);
+		       "MT6358_AUDIO_DIG_2ND_DSN_REV0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDIO_DIG_2ND_DSN_DBI, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDIO_DIG_2ND_DSN_DBI = 0x%x\n",
-		       MT6358_AUDIO_DIG_2ND_DSN_DBI, value);
+		       "MT6358_AUDIO_DIG_2ND_DSN_DBI = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDIO_DIG_2ND_DSN_DXI, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDIO_DIG_2ND_DSN_DXI = 0x%x\n",
-		       MT6358_AUDIO_DIG_2ND_DSN_DXI, value);
+		       "MT6358_AUDIO_DIG_2ND_DSN_DXI = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_PMIC_NEWIF_CFG3, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_PMIC_NEWIF_CFG3 = 0x%x\n",
-		       MT6358_AFE_PMIC_NEWIF_CFG3, value);
+		       "MT6358_AFE_PMIC_NEWIF_CFG3 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_TOP, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_TOP = 0x%x\n", MT6358_AFE_VOW_TOP, value);
+		       "MT6358_AFE_VOW_TOP = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_CFG0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_CFG0 = 0x%x\n", MT6358_AFE_VOW_CFG0, value);
+		       "MT6358_AFE_VOW_CFG0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_CFG1, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_CFG1 = 0x%x\n", MT6358_AFE_VOW_CFG1, value);
+		       "MT6358_AFE_VOW_CFG1 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_CFG2, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_CFG2 = 0x%x\n", MT6358_AFE_VOW_CFG2, value);
+		       "MT6358_AFE_VOW_CFG2 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_CFG3, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_CFG3 = 0x%x\n", MT6358_AFE_VOW_CFG3, value);
+		       "MT6358_AFE_VOW_CFG3 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_CFG4, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_CFG4 = 0x%x\n", MT6358_AFE_VOW_CFG4, value);
+		       "MT6358_AFE_VOW_CFG4 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_CFG5, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_CFG5 = 0x%x\n", MT6358_AFE_VOW_CFG5, value);
+		       "MT6358_AFE_VOW_CFG5 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_CFG6, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_CFG6 = 0x%x\n", MT6358_AFE_VOW_CFG6, value);
+		       "MT6358_AFE_VOW_CFG6 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_MON0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_MON0 = 0x%x\n", MT6358_AFE_VOW_MON0, value);
+		       "MT6358_AFE_VOW_MON0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_MON1, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_MON1 = 0x%x\n", MT6358_AFE_VOW_MON1, value);
+		       "MT6358_AFE_VOW_MON1 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_MON2, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_MON2 = 0x%x\n", MT6358_AFE_VOW_MON2, value);
+		       "MT6358_AFE_VOW_MON2 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_MON3, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_MON3 = 0x%x\n", MT6358_AFE_VOW_MON3, value);
+		       "MT6358_AFE_VOW_MON3 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_MON4, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_MON4 = 0x%x\n", MT6358_AFE_VOW_MON4, value);
+		       "MT6358_AFE_VOW_MON4 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_MON5, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_MON5 = 0x%x\n", MT6358_AFE_VOW_MON5, value);
+		       "MT6358_AFE_VOW_MON5 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_SN_INI_CFG, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_SN_INI_CFG = 0x%x\n",
-		       MT6358_AFE_VOW_SN_INI_CFG, value);
+		       "MT6358_AFE_VOW_SN_INI_CFG = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_TGEN_CFG0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_TGEN_CFG0 = 0x%x\n",
-		       MT6358_AFE_VOW_TGEN_CFG0, value);
+		       "MT6358_AFE_VOW_TGEN_CFG0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_POSDIV_CFG0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_POSDIV_CFG0 = 0x%x\n",
-		       MT6358_AFE_VOW_POSDIV_CFG0, value);
+		       "MT6358_AFE_VOW_POSDIV_CFG0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_HPF_CFG0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_HPF_CFG0 = 0x%x\n", MT6358_AFE_VOW_HPF_CFG0, value);
+		       "MT6358_AFE_VOW_HPF_CFG0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_PERIODIC_CFG0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_PERIODIC_CFG0 = 0x%x\n",
-		       MT6358_AFE_VOW_PERIODIC_CFG0, value);
+		       "MT6358_AFE_VOW_PERIODIC_CFG0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_PERIODIC_CFG1, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_PERIODIC_CFG1 = 0x%x\n",
-		       MT6358_AFE_VOW_PERIODIC_CFG1, value);
+		       "MT6358_AFE_VOW_PERIODIC_CFG1 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_PERIODIC_CFG2, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_PERIODIC_CFG2 = 0x%x\n",
-		       MT6358_AFE_VOW_PERIODIC_CFG2, value);
+		       "MT6358_AFE_VOW_PERIODIC_CFG2 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_PERIODIC_CFG3, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_PERIODIC_CFG3 = 0x%x\n",
-		       MT6358_AFE_VOW_PERIODIC_CFG3, value);
+		       "MT6358_AFE_VOW_PERIODIC_CFG3 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_PERIODIC_CFG4, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_PERIODIC_CFG4 = 0x%x\n",
-		       MT6358_AFE_VOW_PERIODIC_CFG4, value);
+		       "MT6358_AFE_VOW_PERIODIC_CFG4 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_PERIODIC_CFG5, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_PERIODIC_CFG5 = 0x%x\n",
-		       MT6358_AFE_VOW_PERIODIC_CFG5, value);
+		       "MT6358_AFE_VOW_PERIODIC_CFG5 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_PERIODIC_CFG6, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_PERIODIC_CFG6 = 0x%x\n",
-		       MT6358_AFE_VOW_PERIODIC_CFG6, value);
+		       "MT6358_AFE_VOW_PERIODIC_CFG6 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_PERIODIC_CFG7, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_PERIODIC_CFG7 = 0x%x\n",
-		       MT6358_AFE_VOW_PERIODIC_CFG7, value);
+		       "MT6358_AFE_VOW_PERIODIC_CFG7 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_PERIODIC_CFG8, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_PERIODIC_CFG8 = 0x%x\n",
-		       MT6358_AFE_VOW_PERIODIC_CFG8, value);
+		       "MT6358_AFE_VOW_PERIODIC_CFG8 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_PERIODIC_CFG9, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_PERIODIC_CFG9 = 0x%x\n",
-		       MT6358_AFE_VOW_PERIODIC_CFG9, value);
+		       "MT6358_AFE_VOW_PERIODIC_CFG9 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_PERIODIC_CFG10, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_PERIODIC_CFG10 = 0x%x\n",
-		       MT6358_AFE_VOW_PERIODIC_CFG10, value);
+		       "MT6358_AFE_VOW_PERIODIC_CFG10 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_PERIODIC_CFG11, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_PERIODIC_CFG11 = 0x%x\n",
-		       MT6358_AFE_VOW_PERIODIC_CFG11, value);
+		       "MT6358_AFE_VOW_PERIODIC_CFG11 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_PERIODIC_CFG12, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_PERIODIC_CFG12 = 0x%x\n",
-		       MT6358_AFE_VOW_PERIODIC_CFG12, value);
+		       "MT6358_AFE_VOW_PERIODIC_CFG12 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_PERIODIC_CFG13, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_PERIODIC_CFG13 = 0x%x\n",
-		       MT6358_AFE_VOW_PERIODIC_CFG13, value);
+		       "MT6358_AFE_VOW_PERIODIC_CFG13 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_PERIODIC_CFG14, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_PERIODIC_CFG14 = 0x%x\n",
-		       MT6358_AFE_VOW_PERIODIC_CFG14, value);
+		       "MT6358_AFE_VOW_PERIODIC_CFG14 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_PERIODIC_CFG15, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_PERIODIC_CFG15 = 0x%x\n",
-		       MT6358_AFE_VOW_PERIODIC_CFG15, value);
+		       "MT6358_AFE_VOW_PERIODIC_CFG15 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_PERIODIC_CFG16, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_PERIODIC_CFG16 = 0x%x\n",
-		       MT6358_AFE_VOW_PERIODIC_CFG16, value);
+		       "MT6358_AFE_VOW_PERIODIC_CFG16 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_PERIODIC_CFG17, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_PERIODIC_CFG17 = 0x%x\n",
-		       MT6358_AFE_VOW_PERIODIC_CFG17, value);
+		       "MT6358_AFE_VOW_PERIODIC_CFG17 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_PERIODIC_CFG18, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_PERIODIC_CFG18 = 0x%x\n",
-		       MT6358_AFE_VOW_PERIODIC_CFG18, value);
+		       "MT6358_AFE_VOW_PERIODIC_CFG18 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_PERIODIC_CFG19, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_PERIODIC_CFG19 = 0x%x\n",
-		       MT6358_AFE_VOW_PERIODIC_CFG19, value);
+		       "MT6358_AFE_VOW_PERIODIC_CFG19 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_PERIODIC_CFG20, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_PERIODIC_CFG20 = 0x%x\n",
-		       MT6358_AFE_VOW_PERIODIC_CFG20, value);
+		       "MT6358_AFE_VOW_PERIODIC_CFG20 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_PERIODIC_CFG21, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_PERIODIC_CFG21 = 0x%x\n",
-		       MT6358_AFE_VOW_PERIODIC_CFG21, value);
+		       "MT6358_AFE_VOW_PERIODIC_CFG21 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_PERIODIC_CFG22, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_PERIODIC_CFG22 = 0x%x\n",
-		       MT6358_AFE_VOW_PERIODIC_CFG22, value);
+		       "MT6358_AFE_VOW_PERIODIC_CFG22 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_PERIODIC_CFG23, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_PERIODIC_CFG23 = 0x%x\n",
-		       MT6358_AFE_VOW_PERIODIC_CFG23, value);
+		       "MT6358_AFE_VOW_PERIODIC_CFG23 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_PERIODIC_MON0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_PERIODIC_MON0 = 0x%x\n",
-		       MT6358_AFE_VOW_PERIODIC_MON0, value);
+		       "MT6358_AFE_VOW_PERIODIC_MON0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AFE_VOW_PERIODIC_MON1, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AFE_VOW_PERIODIC_MON1 = 0x%x\n",
-		       MT6358_AFE_VOW_PERIODIC_MON1, value);
+		       "MT6358_AFE_VOW_PERIODIC_MON1 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDENC_DSN_ID, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDENC_DSN_ID = 0x%x\n", MT6358_AUDENC_DSN_ID, value);
+		       "MT6358_AUDENC_DSN_ID = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDENC_DSN_REV0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDENC_DSN_REV0 = 0x%x\n", MT6358_AUDENC_DSN_REV0, value);
+		       "MT6358_AUDENC_DSN_REV0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDENC_DSN_DBI, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDENC_DSN_DBI = 0x%x\n", MT6358_AUDENC_DSN_DBI, value);
+		       "MT6358_AUDENC_DSN_DBI = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDENC_DSN_FPI, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDENC_DSN_FPI = 0x%x\n", MT6358_AUDENC_DSN_FPI, value);
+		       "MT6358_AUDENC_DSN_FPI = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDENC_ANA_CON0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDENC_ANA_CON0 = 0x%x\n", MT6358_AUDENC_ANA_CON0, value);
+		       "MT6358_AUDENC_ANA_CON0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDENC_ANA_CON1, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDENC_ANA_CON1 = 0x%x\n", MT6358_AUDENC_ANA_CON1, value);
+		       "MT6358_AUDENC_ANA_CON1 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDENC_ANA_CON2, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDENC_ANA_CON2 = 0x%x\n", MT6358_AUDENC_ANA_CON2, value);
+		       "MT6358_AUDENC_ANA_CON2 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDENC_ANA_CON3, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDENC_ANA_CON3 = 0x%x\n", MT6358_AUDENC_ANA_CON3, value);
+		       "MT6358_AUDENC_ANA_CON3 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDENC_ANA_CON4, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDENC_ANA_CON4 = 0x%x\n", MT6358_AUDENC_ANA_CON4, value);
+		       "MT6358_AUDENC_ANA_CON4 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDENC_ANA_CON5, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDENC_ANA_CON5 = 0x%x\n", MT6358_AUDENC_ANA_CON5, value);
+		       "MT6358_AUDENC_ANA_CON5 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDENC_ANA_CON6, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDENC_ANA_CON6 = 0x%x\n", MT6358_AUDENC_ANA_CON6, value);
+		       "MT6358_AUDENC_ANA_CON6 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDENC_ANA_CON7, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDENC_ANA_CON7 = 0x%x\n", MT6358_AUDENC_ANA_CON7, value);
+		       "MT6358_AUDENC_ANA_CON7 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDENC_ANA_CON8, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDENC_ANA_CON8 = 0x%x\n", MT6358_AUDENC_ANA_CON8, value);
+		       "MT6358_AUDENC_ANA_CON8 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDENC_ANA_CON9, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDENC_ANA_CON9 = 0x%x\n", MT6358_AUDENC_ANA_CON9, value);
+		       "MT6358_AUDENC_ANA_CON9 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDENC_ANA_CON10, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDENC_ANA_CON10 = 0x%x\n", MT6358_AUDENC_ANA_CON10, value);
+		       "MT6358_AUDENC_ANA_CON10 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDENC_ANA_CON11, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDENC_ANA_CON11 = 0x%x\n", MT6358_AUDENC_ANA_CON11, value);
+		       "MT6358_AUDENC_ANA_CON11 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDENC_ANA_CON12, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDENC_ANA_CON12 = 0x%x\n", MT6358_AUDENC_ANA_CON12, value);
+		       "MT6358_AUDENC_ANA_CON12 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDDEC_DSN_ID, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDDEC_DSN_ID = 0x%x\n", MT6358_AUDDEC_DSN_ID, value);
+		       "MT6358_AUDDEC_DSN_ID = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDDEC_DSN_REV0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDDEC_DSN_REV0 = 0x%x\n", MT6358_AUDDEC_DSN_REV0, value);
+		       "MT6358_AUDDEC_DSN_REV0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDDEC_DSN_DBI, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDDEC_DSN_DBI = 0x%x\n", MT6358_AUDDEC_DSN_DBI, value);
+		       "MT6358_AUDDEC_DSN_DBI = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDDEC_DSN_FPI, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDDEC_DSN_FPI = 0x%x\n", MT6358_AUDDEC_DSN_FPI, value);
+		       "MT6358_AUDDEC_DSN_FPI = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDDEC_ANA_CON0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDDEC_ANA_CON0 = 0x%x\n", MT6358_AUDDEC_ANA_CON0, value);
+		       "MT6358_AUDDEC_ANA_CON0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDDEC_ANA_CON1, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDDEC_ANA_CON1 = 0x%x\n", MT6358_AUDDEC_ANA_CON1, value);
+		       "MT6358_AUDDEC_ANA_CON1 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDDEC_ANA_CON2, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDDEC_ANA_CON2 = 0x%x\n", MT6358_AUDDEC_ANA_CON2, value);
+		       "MT6358_AUDDEC_ANA_CON2 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDDEC_ANA_CON3, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDDEC_ANA_CON3 = 0x%x\n", MT6358_AUDDEC_ANA_CON3, value);
+		       "MT6358_AUDDEC_ANA_CON3 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDDEC_ANA_CON4, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDDEC_ANA_CON4 = 0x%x\n", MT6358_AUDDEC_ANA_CON4, value);
+		       "MT6358_AUDDEC_ANA_CON4 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDDEC_ANA_CON5, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDDEC_ANA_CON5 = 0x%x\n", MT6358_AUDDEC_ANA_CON5, value);
+		       "MT6358_AUDDEC_ANA_CON5 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDDEC_ANA_CON6, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDDEC_ANA_CON6 = 0x%x\n", MT6358_AUDDEC_ANA_CON6, value);
+		       "MT6358_AUDDEC_ANA_CON6 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDDEC_ANA_CON7, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDDEC_ANA_CON7 = 0x%x\n", MT6358_AUDDEC_ANA_CON7, value);
+		       "MT6358_AUDDEC_ANA_CON7 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDDEC_ANA_CON8, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDDEC_ANA_CON8 = 0x%x\n", MT6358_AUDDEC_ANA_CON8, value);
+		       "MT6358_AUDDEC_ANA_CON8 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDDEC_ANA_CON9, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDDEC_ANA_CON9 = 0x%x\n", MT6358_AUDDEC_ANA_CON9, value);
+		       "MT6358_AUDDEC_ANA_CON9 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDDEC_ANA_CON10, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDDEC_ANA_CON10 = 0x%x\n", MT6358_AUDDEC_ANA_CON10, value);
+		       "MT6358_AUDDEC_ANA_CON10 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDDEC_ANA_CON11, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDDEC_ANA_CON11 = 0x%x\n", MT6358_AUDDEC_ANA_CON11, value);
+		       "MT6358_AUDDEC_ANA_CON11 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDDEC_ANA_CON12, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDDEC_ANA_CON12 = 0x%x\n", MT6358_AUDDEC_ANA_CON12, value);
+		       "MT6358_AUDDEC_ANA_CON12 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDDEC_ANA_CON13, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDDEC_ANA_CON13 = 0x%x\n", MT6358_AUDDEC_ANA_CON13, value);
+		       "MT6358_AUDDEC_ANA_CON13 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDDEC_ANA_CON14, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDDEC_ANA_CON14 = 0x%x\n", MT6358_AUDDEC_ANA_CON14, value);
+		       "MT6358_AUDDEC_ANA_CON14 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDDEC_ANA_CON15, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDDEC_ANA_CON15 = 0x%x\n", MT6358_AUDDEC_ANA_CON15, value);
+		       "MT6358_AUDDEC_ANA_CON15 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDDEC_ELR_NUM, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDDEC_ELR_NUM = 0x%x\n", MT6358_AUDDEC_ELR_NUM, value);
+		       "MT6358_AUDDEC_ELR_NUM = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDDEC_ELR_0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDDEC_ELR_0 = 0x%x\n", MT6358_AUDDEC_ELR_0, value);
+		       "MT6358_AUDDEC_ELR_0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDZCD_DSN_ID, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDZCD_DSN_ID = 0x%x\n", MT6358_AUDZCD_DSN_ID, value);
+		       "MT6358_AUDZCD_DSN_ID = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDZCD_DSN_REV0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDZCD_DSN_REV0 = 0x%x\n", MT6358_AUDZCD_DSN_REV0, value);
+		       "MT6358_AUDZCD_DSN_REV0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDZCD_DSN_DBI, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDZCD_DSN_DBI = 0x%x\n", MT6358_AUDZCD_DSN_DBI, value);
+		       "MT6358_AUDZCD_DSN_DBI = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_AUDZCD_DSN_FPI, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_AUDZCD_DSN_FPI = 0x%x\n", MT6358_AUDZCD_DSN_FPI, value);
+		       "MT6358_AUDZCD_DSN_FPI = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_ZCD_CON0, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_ZCD_CON0 = 0x%x\n", MT6358_ZCD_CON0, value);
+		       "MT6358_ZCD_CON0 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_ZCD_CON1, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_ZCD_CON1 = 0x%x\n", MT6358_ZCD_CON1, value);
+		       "MT6358_ZCD_CON1 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_ZCD_CON2, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_ZCD_CON2 = 0x%x\n", MT6358_ZCD_CON2, value);
+		       "MT6358_ZCD_CON2 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_ZCD_CON3, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_ZCD_CON3 = 0x%x\n", MT6358_ZCD_CON3, value);
+		       "MT6358_ZCD_CON3 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_ZCD_CON4, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_ZCD_CON4 = 0x%x\n", MT6358_ZCD_CON4, value);
+		       "MT6358_ZCD_CON4 = 0x%x\n", value);
 	regmap_read(priv->regmap, MT6358_ZCD_CON5, &value);
 	n += scnprintf(buffer + n, size - n,
-		       "[0x%x] MT6358_ZCD_CON5 = 0x%x\n", MT6358_ZCD_CON5, value);
+		       "MT6358_ZCD_CON5 = 0x%x\n", value);
 
 	ret = simple_read_from_buffer(buf, count, pos, buffer, n);
 	kfree(buffer);
