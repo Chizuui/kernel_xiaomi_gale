@@ -21,9 +21,6 @@
 static void __iomem *DBGTOP_BASE;
 static unsigned int LATCH_CTL2_OFFSET;
 
-/*indicate have dbgtop hw*/
-static int found_dbgtop_base;
-
 static int mtk_dbgtop_probe(struct platform_device *pdev);
 
 static int mtk_dbgtop_remove(struct platform_device *dev)
@@ -73,21 +70,13 @@ static ssize_t dbgtop_config_show(struct device_driver *driver, char *buf)
 {
 	ssize_t ret = 0;
 
-	if (found_dbgtop_base) {
-		ret += snprintf(buf + ret, PAGE_SIZE - ret,
-			"%s,0x%x\n%s,0x%x\n%s,0x%x\n%s,0x%x\n",
-			"MTK_DBGTOP_MODE", readl(IOMEM(MTK_DBGTOP_MODE)),
-			"MTK_DBGTOP_LATCH_CTL", readl(IOMEM(MTK_DBGTOP_LATCH_CTL)),
-			"MTK_DBGTOP_DEBUG_CTL", readl(IOMEM(MTK_DBGTOP_DEBUG_CTL)),
-			"MTK_DBGTOP_DEBUG_CTL2", readl(IOMEM(MTK_DBGTOP_DEBUG_CTL2)));
-	} else {
-		ret += snprintf(buf + ret, PAGE_SIZE - ret,
-			"%s,0x%x\n%s,0x%x\n%s,0x%x\n%s,0x%x\n",
-			"MTK_DBGTOP_MODE", readl(IOMEM(MTK_DBGTOP_MODE)),
-			"MTK_DBGTOP_LATCH_CTL", readl(IOMEM(MTK_RGU_LATCH_CTL)),
-			"MTK_DBGTOP_DEBUG_CTL", readl(IOMEM(MTK_RGU_DEBUG_CTL)),
-			"MTK_DBGTOP_DEBUG_CTL2", readl(IOMEM(MTK_RGU_DEBUG_CTL2)));
-	}
+	ret += snprintf(buf + ret, PAGE_SIZE - ret,
+		"%s,0x%x\n%s,0x%x\n%s,0x%x\n%s,0x%x\n",
+		"MTK_DBGTOP_MODE", readl(IOMEM(MTK_DBGTOP_MODE)),
+		"MTK_DBGTOP_LATCH_CTL", readl(IOMEM(MTK_DBGTOP_LATCH_CTL)),
+		"MTK_DBGTOP_DEBUG_CTL", readl(IOMEM(MTK_DBGTOP_DEBUG_CTL)),
+		"MTK_DBGTOP_DEBUG_CTL2", readl(IOMEM(MTK_DBGTOP_DEBUG_CTL2)));
+
 	return strlen(buf);
 }
 
@@ -159,25 +148,20 @@ static void __exit mtk_dbgtop_exit(void)
 
 int mtk_dbgtop_dram_reserved(int enable)
 {
-	unsigned int tmp, ddr_reserve_mode;
+	unsigned int tmp;
 
 	if (DBGTOP_BASE == NULL)
 		return -1;
 
-	if (found_dbgtop_base)
-		ddr_reserve_mode = MTK_DBGTOP_MODE_DDR_RESERVE;
-	else
-		ddr_reserve_mode = MTK_RGU_MODE_DDR_RESERVE;
-
 	if (enable == 1) {
 		/* enable DDR reserved mode */
 		tmp = readl(IOMEM(MTK_DBGTOP_MODE));
-		tmp |= (ddr_reserve_mode | MTK_DBGTOP_MODE_KEY);
+		tmp |= (MTK_DBGTOP_MODE_DDR_RESERVE | MTK_DBGTOP_MODE_KEY);
 		mt_reg_sync_writel(tmp, MTK_DBGTOP_MODE);
 	} else if (enable == 0) {
 		/* disable DDR reserved mode */
 		tmp = readl(IOMEM(MTK_DBGTOP_MODE));
-		tmp &= (~ddr_reserve_mode);
+		tmp &= (~MTK_DBGTOP_MODE_DDR_RESERVE);
 		tmp |= MTK_DBGTOP_MODE_KEY;
 		mt_reg_sync_writel(tmp, MTK_DBGTOP_MODE);
 	}
@@ -191,21 +175,12 @@ EXPORT_SYMBOL(mtk_dbgtop_dram_reserved);
 int mtk_dbgtop_cfg_dvfsrc(int enable)
 {
 	unsigned int debug_ctl2, latch_ctl;
-	void __iomem *latch_ctl_base, *debug_ctl2_base;
 
 	if (DBGTOP_BASE == NULL)
 		return -1;
 
-	if (found_dbgtop_base) {
-		latch_ctl_base = MTK_DBGTOP_LATCH_CTL;
-		debug_ctl2_base = MTK_DBGTOP_DEBUG_CTL2;
-	} else {
-		latch_ctl_base = MTK_RGU_LATCH_CTL;
-		debug_ctl2_base = MTK_RGU_LATCH_CTL2;
-	}
-
-	debug_ctl2 = readl(IOMEM(debug_ctl2_base));
-	latch_ctl = readl(IOMEM(latch_ctl_base));
+	debug_ctl2 = readl(IOMEM(MTK_DBGTOP_DEBUG_CTL2));
+	latch_ctl = readl(IOMEM(MTK_DBGTOP_LATCH_CTL));
 
 	if (enable == 1) {
 		/* enable dvfsrc_en */
@@ -219,15 +194,15 @@ int mtk_dbgtop_cfg_dvfsrc(int enable)
 	}
 
 	debug_ctl2 |= MTK_DBGTOP_DEBUG_CTL2_KEY;
-	mt_reg_sync_writel(debug_ctl2, debug_ctl2_base);
+	mt_reg_sync_writel(debug_ctl2, MTK_DBGTOP_DEBUG_CTL2);
 
 	latch_ctl |= MTK_DBGTOP_LATCH_CTL_KEY;
-	mt_reg_sync_writel(latch_ctl, latch_ctl_base);
+	mt_reg_sync_writel(latch_ctl, MTK_DBGTOP_LATCH_CTL);
 
 	pr_info("%s: MTK_DBGTOP_DEBUG_CTL2(0x%x)\n",
-		__func__, readl(IOMEM(debug_ctl2_base)));
+		__func__, readl(IOMEM(MTK_DBGTOP_DEBUG_CTL2)));
 	pr_info("%s: MTK_DBGTOP_LATCH_CTL(0x%x)\n",
-		__func__, readl(IOMEM(latch_ctl_base)));
+		__func__, readl(IOMEM(MTK_DBGTOP_LATCH_CTL)));
 
 	return 0;
 }
@@ -235,28 +210,13 @@ EXPORT_SYMBOL(mtk_dbgtop_cfg_dvfsrc);
 
 int mtk_dbgtop_pause_dvfsrc(int enable)
 {
-	unsigned int tmp, dvfsrc_pause_pulse;
+	unsigned int tmp;
 	unsigned int count = 100;
-	void __iomem *debug_ctl_base, *debug_ctl2_base;
 
 	if (DBGTOP_BASE == NULL)
 		return -1;
-	if (found_dbgtop_base) {
-		dvfsrc_pause_pulse = MTK_DBGTOP_DVFSRC_PAUSE_PULSE;
-		debug_ctl_base = MTK_DBGTOP_DEBUG_CTL;
-		debug_ctl2_base = MTK_DBGTOP_DEBUG_CTL2;
-	} else {
-#if defined(CONFIG_MACH_MT6779) || defined(CONFIG_MACH_MT6768) \
-	|| defined(CONFIG_MACH_MT6785) || defined(CONFIG_MACH_MT6781)
-		dvfsrc_pause_pulse = MTK_RGU_DVFSRC_PAUSE_PULSE;
-		debug_ctl_base = MTK_RGU_DEBUG_CTL;
-		debug_ctl2_base = MTK_RGU_DEBUG_CTL2;
-#else
-		pr_info("%s: not support the function\n", __func__);
-		return -ENODEV;
-#endif
-	}
-	if (!(readl(IOMEM(debug_ctl2_base))
+
+	if (!(readl(IOMEM(MTK_DBGTOP_DEBUG_CTL2))
 		& MTK_DBGTOP_DVFSRC_EN)) {
 		pr_info("%s: not enable DVFSRC\n", __func__);
 		return 0;
@@ -264,29 +224,29 @@ int mtk_dbgtop_pause_dvfsrc(int enable)
 
 	if (enable == 1) {
 		/* enable DVFSRC pause */
-		tmp = readl(IOMEM(debug_ctl_base));
-		tmp |= dvfsrc_pause_pulse;
+		tmp = readl(IOMEM(MTK_DBGTOP_DEBUG_CTL));
+		tmp |= MTK_DBGTOP_DVFSRC_PAUSE_PULSE;
 		tmp |= MTK_DBGTOP_DEBUG_CTL_KEY;
-		mt_reg_sync_writel(tmp, debug_ctl_base);
+		mt_reg_sync_writel(tmp, MTK_DBGTOP_DEBUG_CTL);
 		while (count--) {
-			if ((readl(IOMEM(debug_ctl_base))
+			if ((readl(IOMEM(MTK_DBGTOP_DEBUG_CTL))
 				& MTK_DBGTOP_DVFSRC_SUCECESS_ACK))
 				break;
 			udelay(10);
 		}
 
 		pr_info("%s: DVFSRC pause result(0x%x)\n",
-			__func__, readl(IOMEM(debug_ctl_base)));
+			__func__, readl(IOMEM(MTK_DBGTOP_DEBUG_CTL)));
 	} else if (enable == 0) {
 		/* disable DVFSRC pause */
-		tmp = readl(IOMEM(debug_ctl_base));
-		tmp &= (~dvfsrc_pause_pulse);
+		tmp = readl(IOMEM(MTK_DBGTOP_DEBUG_CTL));
+		tmp &= (~MTK_DBGTOP_DVFSRC_PAUSE_PULSE);
 		tmp |= MTK_DBGTOP_DEBUG_CTL_KEY;
-		mt_reg_sync_writel(tmp, debug_ctl_base);
+		mt_reg_sync_writel(tmp, MTK_DBGTOP_DEBUG_CTL);
 	}
 
 	pr_info("%s: MTK_DBGTOP_DEBUG_CTL(0x%x)\n",
-		__func__, readl(IOMEM(debug_ctl_base)));
+		__func__, readl(IOMEM(MTK_DBGTOP_DEBUG_CTL)));
 
 	return 0;
 }
@@ -295,6 +255,7 @@ EXPORT_SYMBOL(mtk_dbgtop_pause_dvfsrc);
 static int __init mtk_dbgtop_get_base_addr(void)
 {
 	struct device_node *np_dbgtop;
+	int found_dbgtop_base = 0;
 
 	for_each_matching_node(np_dbgtop, mtk_dbgtop_of_ids) {
 		pr_info("%s: compatible node found: %s\n",
@@ -333,6 +294,7 @@ int mtk_dbgtop_dfd_count_en(int value)
 	unsigned int tmp;
 
 	/* dfd_count_en is obsolete, enable dfd_en only here */
+
 	if (value == 1) {
 		/* enable dfd_en */
 		tmp = readl(IOMEM(MTK_DBGTOP_LATCH_CTL2));
@@ -344,11 +306,6 @@ int mtk_dbgtop_dfd_count_en(int value)
 		tmp &= ~MTK_DBGTOP_DFD_EN;
 		tmp |= MTK_DBGTOP_LATCH_CTL2_KEY;
 		mt_reg_sync_writel(tmp, MTK_DBGTOP_LATCH_CTL2);
-#if defined(CONFIG_MACH_MT6781)
-		tmp = 0;
-		tmp |= MTK_DBGTOP_LATCH_CTL2_KEY;
-		mt_reg_sync_writel(tmp, MTK_RGU_MFG_EN);
-#endif
 	}
 
 	pr_info("%s: MTK_DBGTOP_LATCH_CTL2(0x%x)\n", __func__,
@@ -409,8 +366,6 @@ int mtk_dbgtop_dfd_timeout(int value)
 {
 	unsigned int tmp;
 
-	pr_debug("%s: before MTK_DBGTOP_LATCH_CTL2(0x%x)\n", __func__,
-		readl(IOMEM(MTK_DBGTOP_LATCH_CTL2)));
 	value <<= MTK_DBGTOP_DFD_TIMEOUT_SHIFT;
 	value &= MTK_DBGTOP_DFD_TIMEOUT_MASK;
 	/* break if dfd timeout >= target value */
@@ -421,7 +376,7 @@ int mtk_dbgtop_dfd_timeout(int value)
 	tmp |= value | MTK_DBGTOP_LATCH_CTL2_KEY;
 	mt_reg_sync_writel(tmp, MTK_DBGTOP_LATCH_CTL2);
 
-	pr_debug("%s: MTK_DBGTOP_LATCH_CTL2(0x%x)\n", __func__,
+	pr_info("%s: MTK_DBGTOP_LATCH_CTL2(0x%x)\n", __func__,
 		readl(IOMEM(MTK_DBGTOP_LATCH_CTL2)));
 
 	return 0;
@@ -432,7 +387,7 @@ int mtk_dbgtop_mfg_pwr_on(int value)
 {
 	unsigned int tmp;
 
-	if (!DBGTOP_BASE || !found_dbgtop_base)
+	if (!DBGTOP_BASE)
 		return -1;
 
 	if (value == 1) {
@@ -457,7 +412,7 @@ int mtk_dbgtop_mfg_pwr_en(int value)
 {
 	unsigned int tmp;
 
-	if (!DBGTOP_BASE || !found_dbgtop_base)
+	if (!DBGTOP_BASE)
 		return -1;
 
 	if (value == 1) {
