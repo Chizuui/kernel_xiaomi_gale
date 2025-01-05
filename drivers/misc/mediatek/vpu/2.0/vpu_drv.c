@@ -833,7 +833,6 @@ static long vpu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 	int ret = 0;
 	struct vpu_user *user = flip->private_data;
 	int i = 0;
-	uint8_t plane_count = 0;
 
 	switch (cmd) {
 	case VPU_IOCTL_SET_POWER:
@@ -903,40 +902,16 @@ static long vpu_ioctl(struct file *flip, unsigned int cmd, unsigned long arg)
 			goto out;
 		}
 
-		if (ret) {
+		if (ret)
 			LOG_ERR("[ENQUE] get params failed, ret=%d\n", ret);
-			vpu_free_request(req);
-			ret = -EINVAL;
-			goto out;
-		} else if (req->buffer_count > VPU_MAX_NUM_PORTS) {
+		else if (req->buffer_count > VPU_MAX_NUM_PORTS) {
 			LOG_ERR("[ENQUE] %s, count=%d\n",
 				"wrong buffer count", req->buffer_count);
-			vpu_free_request(req);
-			ret = -EINVAL;
-			goto out;
 		} else if (copy_from_user(req->buffers, u_req->buffers,
 			    req->buffer_count * sizeof(struct vpu_buffer))) {
 			LOG_ERR("[ENQUE] %s, ret=%d\n",
 				"copy 'struct buffer' failed", ret);
-			vpu_free_request(req);
-			ret = -EINVAL;
-			goto out;
-		}
-
-		/* Check if user plane_count is valid */
-		for (i = 0 ; i < req->buffer_count; i++) {
-			plane_count = req->buffers[i].plane_count;
-			if ((plane_count > VPU_MAX_NUM_PLANE) ||
-				(plane_count == 0)) {
-				vpu_free_request(req);
-				ret = -EINVAL;
-				LOG_ERR("[ENQUE] Buffer#%d plane_count:%d is invalid!\n",
-							i, plane_count);
-				goto out;
-			}
-		}
-
-		if (copy_from_user(req->buf_ion_infos,
+		} else if (copy_from_user(req->buf_ion_infos,
 				u_req->buf_ion_infos,
 				req->buffer_count * 3 * sizeof(uint64_t))) {
 			LOG_ERR("[ENQUE] %s, ret=%d\n",
