@@ -169,9 +169,7 @@ struct charger_ops {
 	int (*enable_hz)(struct charger_device *dev, bool en);
 
 	int (*enable_bleed_discharge)(struct charger_device *dev, bool en);
-
-	/* misc */
-	int (*get_ext_chgtyp)(struct charger_device *);
+	int (*get_vendor_id)(struct charger_device *dev, u32 *uA);
 };
 
 static inline void *charger_dev_get_drvdata(
@@ -356,7 +354,5 @@ extern int unregister_charger_device_notifier(
 extern int charger_dev_notify(
 	struct charger_device *charger_dev, int event);
 
-/* For sgm41516d */
-int charger_dev_get_ext_chgtyp(struct charger_device *chg_dev);
 
 #endif /*LINUX_POWER_CHARGER_CLASS_H*/

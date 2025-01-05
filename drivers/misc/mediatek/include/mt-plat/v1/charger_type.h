@@ -16,6 +16,8 @@ enum charger_type {
 	APPLE_1_0A_CHARGER, /* 1A apple charger */
 	APPLE_0_5A_CHARGER, /* 0.5A apple charger */
 	WIRELESS_CHARGER,
+	HVDCP_CHARGER,
+	CHECK_HV,
 };
 #if defined(CONFIG_USB_MTK_HDRC) || defined(CONFIG_USB_MU3D_DRV) \
 	|| defined(CONFIG_EXTCON_MTK_USB)
@@ -35,7 +37,7 @@ extern int register_charger_det_callback(int (*func)(int));
 
 #if defined(CONFIG_MACH_MT6877) || defined(CONFIG_MACH_MT6893) \
 	|| defined(CONFIG_MACH_MT6885) || defined(CONFIG_MACH_MT6785) \
-	|| defined(CONFIG_MACH_MT6853) || defined(CONFIG_MACH_MT6873)
+	|| defined(CONFIG_MACH_MT6853)
 extern bool is_usb_rdy(struct device *dev);
 #else
 extern bool is_usb_rdy(void);

@@ -19,7 +19,6 @@
 #include <mt-plat/v1/charger_class.h>
 
 /* charger_manager notify charger_consumer */
-
 enum {
 	CHARGER_NOTIFY_EOC,
 	CHARGER_NOTIFY_START_CHARGING,
@@ -94,6 +93,9 @@ extern int charger_manager_enable_power_path(
 	struct charger_consumer *consumer,
 	int idx,
 	bool en);
+extern int charger_manager_set_input_suspend(int suspend);
+extern int charger_manager_is_input_suspend(void);
+
 extern int charger_manager_force_disable_power_path(
 	struct charger_consumer *consumer,
 	int idx,
@@ -113,5 +115,5 @@ extern int mtk_chr_is_charger_exist(unsigned char *exist);
 extern bool is_power_path_supported(void);
 extern int charger_get_vbus(void);
 extern bool mt_charger_plugin(void);
-extern int mt_check_cable_in(void);
+
 #endif /* __MTK_CHARGER_H__ */
