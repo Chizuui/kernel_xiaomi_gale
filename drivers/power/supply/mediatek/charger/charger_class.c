@@ -118,6 +118,16 @@ int charger_dev_get_charging_current(struct charger_device *chg_dev, u32 *uA)
 }
 EXPORT_SYMBOL(charger_dev_get_charging_current);
 
+int charger_dev_get_vendor_id(struct charger_device *chg_dev, u32 *uA)
+{
+	if (chg_dev != NULL && chg_dev->ops != NULL &&
+	    chg_dev->ops->get_vendor_id)
+		return chg_dev->ops->get_vendor_id(chg_dev, uA);
+
+	return -ENOTSUPP;
+}
+EXPORT_SYMBOL(charger_dev_get_vendor_id);
+
 int charger_dev_get_min_charging_current(struct charger_device *chg_dev,
 					 u32 *uA)
 {
@@ -787,15 +797,6 @@ int charger_dev_enable_bleed_discharge(struct charger_device *charger_dev,
 	return -ENOTSUPP;
 }
 EXPORT_SYMBOL(charger_dev_enable_bleed_discharge);
-
-int charger_dev_get_ext_chgtyp(struct charger_device *chg_dev)
-{
-	if (chg_dev != NULL && chg_dev->ops != NULL && chg_dev->ops->get_ext_chgtyp)
-		return chg_dev->ops->get_ext_chgtyp(chg_dev);
-
-	return -ENOTSUPP;
-}
-EXPORT_SYMBOL(charger_dev_get_ext_chgtyp);
 
 static DEVICE_ATTR(name, 0444, charger_show_name, NULL);
 
