@@ -10,7 +10,6 @@ obj-n   +=  tpd_debug.o
 obj-n   +=  tpd_default.o
 obj-n   +=  tpd_misc.o
 obj-n   +=  tpd_setting.o
-obj-$(CONFIG_TOUCHSCREEN_MTK_SOLOMON)	+=  SOLOMON/
 obj-$(CONFIG_TOUCHSCREEN_COMMON)	    +=  lct_tp_info.o
 obj-$(CONFIG_TOUCHSCREEN_COMMON)	    +=  lct_tp_selftest.o
 obj-$(CONFIG_TOUCHSCREEN_COMMON)	    +=  lct_tp_work.o
