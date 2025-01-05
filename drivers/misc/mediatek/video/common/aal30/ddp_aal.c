@@ -19,7 +19,7 @@
 #if defined(CONFIG_MACH_MT6765) || defined(CONFIG_MACH_MT6761) || \
 	defined(CONFIG_MACH_MT6580) || defined(CONFIG_MACH_MT6779) || \
 	defined(CONFIG_MACH_MT6768) || defined(CONFIG_MACH_MT6771) || \
-	defined(CONFIG_MACH_MT6785) || defined(CONFIG_MACH_MT6739)
+    defined(CONFIG_MACH_MT6785) || defined(CONFIG_MACH_MT6785)
 #include <mtk_leds_drv.h>
 #else
 #define backlight_brightness_set(x) do { } while (0)
@@ -1424,7 +1424,7 @@ void disp_aal_notify_backlight_changed(int bl_1024)
 
 	disp_aal_exit_idle(__func__, 1);
 
-	max_backlight = disp_pwm_get_max_backlight(DISP_PWM0);
+	max_backlight = 2047;
 	if (bl_1024 > max_backlight)
 		bl_1024 = max_backlight;
 
