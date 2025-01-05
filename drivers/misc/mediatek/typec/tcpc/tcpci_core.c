@@ -439,9 +439,9 @@ struct tcpc_device *tcpc_device_register(struct device *parent,
 	 * please use it instead of "WAKE_LOCK_SUSPEND"
 	 */
 	tcpc->attach_wake_lock =
-		wakeup_source_register(NULL, "tcpc_attach_wake_lock");
+		wakeup_source_register(&tcpc->dev, "tcpc_attach_wake_lock");
 	tcpc->detach_wake_lock =
-		wakeup_source_register(NULL, "tcpc_detach_wake_lock");
+		wakeup_source_register(&tcpc->dev, "tcpc_detach_wake_lock");
 
 	tcpci_timer_init(tcpc);
 #ifdef CONFIG_USB_POWER_DELIVERY
@@ -478,7 +478,7 @@ static int tcpc_device_irq_enable(struct tcpc_device *tcpc)
 	}
 
 	schedule_delayed_work(
-		&tcpc->event_init_work, msecs_to_jiffies(10*1000));
+		&tcpc->event_init_work, msecs_to_jiffies(0));
 
 	pr_info("%s : tcpc irq enable OK!\n", __func__);
 	return 0;
@@ -558,7 +558,7 @@ static void tcpc_event_init_work(struct work_struct *work)
 	tcpc->chg_psy = devm_power_supply_get_by_phandle(
 		tcpc->dev.parent, "charger");
 #endif
-	if (!tcpc->chg_psy) {
+	if (IS_ERR_OR_NULL(tcpc->chg_psy)) {
 		tcpci_unlock_typec(tcpc);
 		TCPC_ERR("%s get charger psy fail\n", __func__);
 		return;
