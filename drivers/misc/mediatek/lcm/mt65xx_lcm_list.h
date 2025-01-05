@@ -9,6 +9,10 @@
 
 #include <lcm_drv.h>
 
+extern struct LCM_DRIVER dsi_panel_c3u_42_0f_0d_dsc_vdo_lcm_drv;
+extern struct LCM_DRIVER dsi_panel_c3u_46_0f_0c_dsc_vdo_lcm_drv;
+extern struct LCM_DRIVER dsi_panel_c3u_43_02_0a_dsc_vdo_lcm_drv;
+extern struct LCM_DRIVER dsi_panel_c3u_35_03_0b_dsc_vdo_lcm_drv;
 extern struct LCM_DRIVER otm1282a_hd720_dsi_vdo_60hz_lcm_drv;
 extern struct LCM_DRIVER otm1282a_hd720_dsi_vdo_lcm_drv;
 extern struct LCM_DRIVER nt35595_fhd_dsi_cmd_truly_8163_lcm_drv;
@@ -338,8 +342,6 @@ extern struct LCM_DRIVER hx83102p_wxga_vdo_incell_boe_lcm_drv;
 extern struct LCM_DRIVER otm1911a_fhdp_dsi_vdo_truly_rt4801_lcm_drv;
 extern struct LCM_DRIVER nt36672c_fhdp_dsi_vdo_120hz_shenchao_6382_lcm_drv;
 extern struct LCM_DRIVER nt36672c_fhdp_dsi_vdo_auo_cphy_90hz_jdi_lcm_drv;
-extern struct LCM_DRIVER nt36672c_fhdp_dsi_vdo_dsc_txd_boe_lcm_drv;
-extern struct LCM_DRIVER kd070fhfid015_dsi_1200x1920_lcm_drv;
 
 #ifdef BUILD_LK
 extern void mdelay(unsigned long msec);

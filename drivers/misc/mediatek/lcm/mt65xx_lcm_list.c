@@ -21,6 +21,18 @@ enum LCM_DSI_MODE_CON lcm_dsi_mode;
 #define LCD_HW_ID_STATUS_ERROR  0x03
 
 struct LCM_DRIVER *lcm_driver_list[] = {
+#if defined(DSI_PANEL_C3U_42_0F_0D_DSC_VDO)
+    &dsi_panel_c3u_42_0f_0d_dsc_vdo_lcm_drv,
+#endif
+#if defined(DSI_PANEL_C3U_46_0F_0C_DSC_VDO)
+    &dsi_panel_c3u_46_0f_0c_dsc_vdo_lcm_drv,
+#endif
+#if defined(DSI_PANEL_C3U_43_02_0A_DSC_VDO)
+    &dsi_panel_c3u_43_02_0a_dsc_vdo_lcm_drv,
+#endif
+#if defined(DSI_PANEL_C3U_35_03_0B_DSC_VDO)
+    &dsi_panel_c3u_35_03_0b_dsc_vdo_lcm_drv,
+#endif
 #if defined(HX83102P_WXGA_VDO_INCELL_BOE)
 	&hx83102p_wxga_vdo_incell_boe_lcm_drv,
 #endif
@@ -1283,14 +1295,6 @@ struct LCM_DRIVER *lcm_driver_list[] = {
 #if defined(OTM1911A_FHDP_DSI_VDO_TRULY_RT4801)
 	&otm1911a_fhdp_dsi_vdo_truly_rt4801_lcm_drv,
 #endif
-// mt6768 ref device
-#if defined(NT36672C_FHDP_DSI_VDO_DSC_TXD_BOE)
-	&nt36672c_fhdp_dsi_vdo_dsc_txd_boe_lcm_drv,
-#endif
-
-#if defined(KD070FHFID015_DSI_1200X1920)
-	&kd070fhfid015_dsi_1200x1920_lcm_drv,
-#endif
 };
 
 unsigned char lcm_name_list[][128] = {
@@ -1366,10 +1370,6 @@ unsigned char lcm_name_list[][128] = {
 
 #if defined(OPPO_TIANMA_TD4310_FHDP_DSI_VDO_RT5081)
 	"oppo_tianma_td4310_fhdp_dsi_vdo_rt5081_drv",
-#endif
-
-#if defined(KD070FHFID015_DSI_1200X1920)
-	"kd070fhfid015_dsi_1200x1920",
 #endif
 };
 
