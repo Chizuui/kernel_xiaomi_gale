@@ -120,12 +120,7 @@ s32 get_md_hrt_bw(void)
 #if IS_ENABLED(CONFIG_MACH_MT6853)
 	return 3344;
 #elif IS_ENABLED(CONFIG_MACH_MT6877)
-	/*
-	 * Reduce MD worst HRT BW for DISP layers .
-	 * If there is disp underrun issue, we need to confirm
-	 * whether to add MD var: 1700.
-	 */
-	return (3427*100/65);
+	return (3427*100/65+1700);
 #elif IS_ENABLED(CONFIG_MACH_MT6781)
 	return 1843;
 #else
