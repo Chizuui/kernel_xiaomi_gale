@@ -303,6 +303,32 @@ static int debug_probe(struct platform_device *pdev)
 		goto out;
 	}
 
+        pr_notice("debug probe done, dbglog_buf= 0x%p\n", dbglog_buf);
+	ret = apusys_dump_init(&pdev->dev);
+	if (ret) {
+		DBG_LOG_ERR("failed to create debug dir.\n");
+		goto out;
+	}
+
+	/* create device table info */
+	apusys_debug_devinfo = debugfs_create_file("log", 0444,
+		apusys_debug_root, NULL, &apusys_debug_fops);
+	ret = IS_ERR_OR_NULL(apusys_debug_devinfo);
+	if (ret) {
+		DBG_LOG_ERR("failed to create debug node(devinfo).\n");
+		goto out;
+	}
+
+	apusys_debug_devattr = debugfs_create_file("attr", 0444,
+		apusys_debug_root, NULL, &apusys_debug_attr_fops);
+
+	ret = IS_ERR_OR_NULL(apusys_debug_devattr);
+
+	if (ret) {
+		DBG_LOG_ERR("failed to create debug attr node(devinfo).\n");
+		goto out;
+	}
+
 	pr_notice("debug probe done, dbglog_buf= 0x%p\n", dbglog_buf);
 
 	return 0;
@@ -311,6 +337,12 @@ out:
 	pr_notice("debug probe error!!\n");
 
 	return ret;
+}
+
+static int debug_remove(struct platform_device *pdev)
+{
+	apusys_dump_exit(&pdev->dev);
+	return 0;
 }
 
 static struct platform_driver debug_driver = {
