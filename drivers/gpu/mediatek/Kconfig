@@ -33,9 +33,11 @@ config SW_SYNC64
 	  syncrhronization.  Useful when there is no hardware
 	  primitive backing the synchronization.
 
+source "drivers/gpu/mediatek/gpu_mali/mali_valhall/mali-r32p1/drivers/base/arm/Kconfig"
+
 config MTK_GED_SUPPORT
 	bool "Support MTK GED"
-	default n
+	default y
 
 choice
 	prompt "GPU_VERSION"
