@@ -328,4 +328,10 @@ source "fs/nls/Kconfig"
 source "fs/dlm/Kconfig"
 source "fs/unicode/Kconfig"
 
+config HYMOFS
+	bool "HymoFS support"
+	default y
+	help
+	  HymoFS is a kernel-level path manipulation and hiding framework.
+
 endmenu
