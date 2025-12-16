@@ -11,7 +11,9 @@
 #include <linux/random.h>
 #include <linux/utsname.h>
 #include <linux/workqueue.h>
+#if defined(CONFIG_ARCH_HAS_RANDOM) || defined(CONFIG_X86)
 #include <asm/archrandom.h>
+#endif
 
 #ifdef CONFIG_VDSO_GETRANDOM
 #include <vdso/getrandom.h>
@@ -176,7 +178,7 @@ void lrng_reset_state(void)
 	lrng_state.all_online_numa_node_seeded = false;
 
 #ifdef CONFIG_VDSO_GETRANDOM
-	WRITE_ONCE(vdso_k_rng_data->is_ready, false);
+	WRITE_ONCE(__arch_get_k_vdso_rng_data()->is_ready, false);
 #endif
 
 	pr_debug("reset LRNG\n");
@@ -220,7 +222,7 @@ static void lrng_init_wakeup(void)
 	 * The LRNG does not enable the user space ChaCha20
 	 * DRNG in the VDSO.
 	 */
-	/* WRITE_ONCE(vdso_k_rng_data->is_ready, true); */
+	/* WRITE_ONCE(__arch_get_k_vdso_rng_data()->is_ready, true); */
 #endif
 
 	wake_up_all(&lrng_init_wait);
@@ -290,7 +292,7 @@ void lrng_unset_fully_seeded(struct lrng_drng *drng)
 		lrng_state.lrng_fully_seeded = false;
 
 #ifdef CONFIG_VDSO_GETRANDOM
-		WRITE_ONCE(vdso_k_rng_data->is_ready, false);
+		WRITE_ONCE(__arch_get_k_vdso_rng_data()->is_ready, false);
 #endif
 
 		/* If sufficient entropy is available, reseed now. */
@@ -309,6 +311,7 @@ static void lrng_set_operational(void)
 	 */
 	if (lrng_state.lrng_fully_seeded) {
 		lrng_state.lrng_operational = true;
+		lrng_process_ready_list();
 		lrng_init_wakeup();
 		pr_info("LRNG fully operational\n");
 	}
@@ -411,19 +414,12 @@ void __init lrng_rand_initialize_early(void)
 				    sizeof(unsigned long))];
 		struct new_utsname utsname;
 	} seed __aligned(LRNG_KCAPI_ALIGN);
-	size_t longs = 0;
 	unsigned int i;
 
-	for (i = 0; i < ARRAY_SIZE(seed.data); i += longs) {
-		longs = arch_get_random_seed_longs(seed.data + i,
-						   ARRAY_SIZE(seed.data) - i);
-		if (longs)
-			continue;
-		longs = arch_get_random_longs(seed.data + i,
-					      ARRAY_SIZE(seed.data) - i);
-		if (longs)
-			continue;
-		longs = 1;
+	for (i = 0; i < ARRAY_SIZE(seed.data); i++) {
+		if (!arch_get_random_seed_long_early(&(seed.data[i])) &&
+		    !arch_get_random_long_early(&seed.data[i]))
+			seed.data[i] = random_get_entropy();
 	}
 	memcpy(&seed.utsname, init_utsname(), sizeof(*(init_utsname())));
 
