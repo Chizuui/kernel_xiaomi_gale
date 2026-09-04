@@ -526,3 +526,6 @@ CONFIG_NOMOUNT=y
 # Drivers/encore_fas/Kconfig selects UPROBES, so no explicit CONFIG_UPROBES here.
 # Built in (not "m") because MODULES is not enabled in this defconfig.
 CONFIG_ENCORE_FAS=y
+
+# Android 13+ Kernel FCM Level 7 VINTF compatibility requirement.
+CONFIG_INIT_STACK_ALL_ZERO=y
