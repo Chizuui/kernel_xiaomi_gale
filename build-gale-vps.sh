@@ -8,11 +8,13 @@ CLANG_REVISION="${CLANG_REVISION:-clang-r547379}"
 RESUKISU_REF="${RESUKISU_REF:-main}"
 CONFIG_NAME="${CONFIG_NAME:-gale_defconfig}"
 JOBS="${JOBS:-$(nproc)}"
-INSTALL_DEPS="${INSTALL_DEPS:-1}"
+INSTALL_DEPS="${INSTALL_DEPS:-0}"
 PACKAGE="${PACKAGE:-1}"
 ANYKERNEL_DIR="${ANYKERNEL_DIR:-$ROOT_DIR/AnyKernel3}"
 ANYKERNEL_REPO="${ANYKERNEL_REPO:-https://github.com/Chizuui/AnyKernel3.git}"
 ANYKERNEL_BRANCH="${ANYKERNEL_BRANCH:-priestess}"
+CROSS_COMPILE="${CROSS_COMPILE:-aarch64-linux-gnu-}"
+CROSS_COMPILE_ARM32="${CROSS_COMPILE_ARM32:-arm-linux-gnueabi-}"
 
 CLANG_URL="https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/llvm-r547379-release/${CLANG_REVISION}.tar.gz"
 
@@ -32,20 +34,23 @@ if [[ "$INSTALL_DEPS" == 1 ]]; then
   elif command -v sudo >/dev/null 2>&1; then
     APT=(sudo apt-get)
   else
-    die "Butuh root atau sudo untuk install dependency. Set INSTALL_DEPS=0 jika semuanya sudah tersedia."
+    printf 'WARNING: sudo/root tidak tersedia; melewati apt-get.\n'
+    APT=()
   fi
 
-  "${APT[@]}" update
-  "${APT[@]}" install -y \
-    bc bison build-essential curl flex git libelf-dev libncurses-dev \
-    libssl-dev python3 rsync unzip xz-utils zip zstd \
-    gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi \
-    binutils-aarch64-linux-gnu binutils-arm-linux-gnueabi
+  if ((${#APT[@]})); then
+    "${APT[@]}" update
+    "${APT[@]}" install -y \
+      bc bison build-essential curl flex git libelf-dev libncurses-dev \
+      libssl-dev python3 rsync unzip xz-utils zip zstd \
+      gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi \
+      binutils-aarch64-linux-gnu binutils-arm-linux-gnueabi
+  fi
 fi
 
-command -v make >/dev/null || die "make tidak ditemukan."
-command -v curl >/dev/null || die "curl tidak ditemukan."
-command -v tar >/dev/null || die "tar tidak ditemukan."
+for required in make curl tar git bc bison flex rsync zip; do
+  command -v "$required" >/dev/null || die "$required tidak ditemukan. Install dependency di image VPS terlebih dahulu."
+done
 
 log "Download/cache AOSP Clang ${CLANG_REVISION}"
 mkdir -p "$CLANG_DIR"
@@ -61,6 +66,14 @@ fi
 export PATH="$CLANG_DIR/bin:$PATH"
 command -v clang >/dev/null || die "clang tidak ditemukan setelah setup toolchain."
 command -v ld.lld >/dev/null || die "ld.lld tidak ditemukan setelah setup toolchain."
+
+if ! command -v "${CROSS_COMPILE}ld" >/dev/null 2>&1; then
+  printf 'WARNING: %sld tidak ditemukan; memakai LLVM target tools.\n' "$CROSS_COMPILE"
+  CROSS_COMPILE=""
+fi
+if [[ -n "$CROSS_COMPILE_ARM32" ]] && ! command -v "${CROSS_COMPILE_ARM32}ld" >/dev/null 2>&1; then
+  CROSS_COMPILE_ARM32=""
+fi
 
 log "Setup ReSukiSU"
 if [[ ! -d KernelSU || ! -e drivers/kernelsu ]]; then
@@ -96,8 +109,8 @@ rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"
 
 make -s O="$OUT_DIR" ARCH=arm64 LLVM=1 LLVM_IAS=1 \
-  CC=clang LD=ld.lld CROSS_COMPILE=aarch64-linux-gnu- \
-  CROSS_COMPILE_ARM32=arm-linux-gnueabi- "$CONFIG_NAME"
+  CC=clang LD=ld.lld CROSS_COMPILE="$CROSS_COMPILE" \
+  CROSS_COMPILE_ARM32="$CROSS_COMPILE_ARM32" "$CONFIG_NAME"
 
 grep -q '^CONFIG_KSU=y$' "$OUT_DIR/.config" || die "CONFIG_KSU tidak aktif."
 grep -q '^CONFIG_KSU_MANUAL_HOOK=y$' "$OUT_DIR/.config" || die "CONFIG_KSU_MANUAL_HOOK tidak aktif."
@@ -108,8 +121,8 @@ make -j"$JOBS" O="$OUT_DIR" ARCH=arm64 LLVM=1 LLVM_IAS=1 \
   CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm STRIP=llvm-strip \
   OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump READELF=llvm-readelf \
   HOSTCC=clang HOSTCXX=clang++ HOSTAR=llvm-ar HOSTLD=ld.lld \
-  CROSS_COMPILE=aarch64-linux-gnu- \
-  CROSS_COMPILE_ARM32=arm-linux-gnueabi- 2>&1 | tee "$OUT_DIR/compile.log"
+  CROSS_COMPILE="$CROSS_COMPILE" \
+  CROSS_COMPILE_ARM32="$CROSS_COMPILE_ARM32" 2>&1 | tee "$OUT_DIR/compile.log"
 
 if [[ "$PACKAGE" == 1 ]]; then
   log "Package AnyKernel3"
