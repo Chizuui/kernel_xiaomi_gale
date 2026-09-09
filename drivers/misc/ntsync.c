@@ -707,11 +707,20 @@ static long ntsync_obj_ioctl(struct file *file, unsigned int cmd,
 	}
 }
 
+/* compat_ptr_ioctl() is not available on the 4.19 base. */
+static long ntsync_compat_ioctl(struct file *file, unsigned int cmd,
+				unsigned long arg)
+{
+	void __user *argp = (void __user *)(unsigned long)(compat_uptr_t)arg;
+
+	return file->f_op->unlocked_ioctl(file, cmd, (unsigned long)argp);
+}
+
 static const struct file_operations ntsync_obj_fops = {
 	.owner		= THIS_MODULE,
 	.release	= ntsync_obj_release,
 	.unlocked_ioctl	= ntsync_obj_ioctl,
-	.compat_ioctl	= compat_ptr_ioctl,
+	.compat_ioctl	= ntsync_compat_ioctl,
 };
 
 static struct ntsync_obj *ntsync_alloc_obj(struct ntsync_device *dev,
@@ -1216,7 +1225,7 @@ static const struct file_operations ntsync_fops = {
 	.open		= ntsync_char_open,
 	.release	= ntsync_char_release,
 	.unlocked_ioctl	= ntsync_char_ioctl,
-	.compat_ioctl	= compat_ptr_ioctl,
+	.compat_ioctl	= ntsync_compat_ioctl,
 };
 
 static struct miscdevice ntsync_misc = {
