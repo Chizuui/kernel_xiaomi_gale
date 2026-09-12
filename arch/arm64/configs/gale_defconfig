@@ -514,3 +514,9 @@ CONFIG_DEFAULT_TCP_CONG="bbrplus"
 # the vendor scheduler, CPU frequency controls, or existing debug options.
 CONFIG_HZ_300=y
 # CONFIG_HZ_250 is not set
+# ReSukiSU manual hooks
+CONFIG_KSU=y
+CONFIG_KSU_MANUAL_HOOK=y
+# CONFIG_KSU_MANUAL_HOOK_AUTO_SETUID_HOOK is not set
+# CONFIG_KSU_MANUAL_HOOK_AUTO_INITRC_HOOK is not set
+# CONFIG_KSU_MANUAL_HOOK_AUTO_INPUT_HOOK is not set
