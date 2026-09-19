@@ -3990,15 +3990,22 @@ void lru_gen_look_around(struct page_vma_mapped_walk *pvmw)
 	unsigned long bitmap[BITS_TO_LONGS(MIN_LRU_BATCH)] = {};
 	struct mem_cgroup *memcg = page_memcg(pvmw->page);
 	struct pglist_data *pgdat = page_pgdat(pvmw->page);
-	struct lruvec *lruvec = mem_cgroup_lruvec(pgdat, memcg);
-	DEFINE_MAX_SEQ(lruvec);
-	int old_gen, new_gen = lru_gen_from_seq(max_seq);
+	struct lruvec *lruvec;
+	unsigned long max_seq;
+	int old_gen, new_gen;
 
 	lockdep_assert_held(pvmw->ptl);
 	VM_BUG_ON_PAGE(PageLRU(pvmw->page), pvmw->page);
 
 	if (spin_is_contended(pvmw->ptl))
 		return;
+
+	if (!mem_cgroup_disabled() && !memcg)
+		return;
+
+	lruvec = mem_cgroup_lruvec(pgdat, memcg);
+	max_seq = READ_ONCE(lruvec->lrugen.max_seq);
+	new_gen = lru_gen_from_seq(max_seq);
 
 	start = max(pvmw->address & PMD_MASK, pvmw->vma->vm_start);
 	end = min(pvmw->address | ~PMD_MASK, pvmw->vma->vm_end - 1) + 1;
