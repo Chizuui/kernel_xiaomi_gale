@@ -91,17 +91,21 @@ log "Validate Gale hooks and NoMount"
 grep -q '^source "fs/nomount/Kconfig"$' fs/Kconfig || die "fs/Kconfig belum memasukkan NoMount."
 grep -q '^obj-\$(CONFIG_NOMOUNT)' fs/Makefile || die "fs/Makefile belum memasukkan NoMount."
 
+log "Validate SUSFS kernel support"
+[[ -f "fs/susfs.c" ]] || die "fs/susfs.c tidak ditemukan."
+[[ -f "include/linux/susfs.h" ]] || die "include/linux/susfs.h tidak ditemukan."
+grep -q 'obj-\$(CONFIG_KSU_SUSFS).*susfs.o' fs/Makefile || die "fs/Makefile belum memasukkan SUSFS."
+
 for check in \
-  'drivers/input/input.c:ksu_handle_input_handle_event' \
-  'fs/exec.c:ksu_handle_execveat' \
+  'drivers/input/input.c:ksu_is_input_hook_enabled' \
+  'fs/exec.c:ksu_handle_post_execveat' \
   'fs/open.c:ksu_handle_faccessat' \
   'fs/read_write.c:ksu_handle_sys_read' \
   'fs/stat.c:ksu_handle_stat' \
-  'kernel/reboot.c:ksu_handle_sys_reboot' \
-  'kernel/sys.c:ksu_handle_setresuid'; do
+  'kernel/reboot.c:ksu_handle_sys_reboot'; do
   file="${check%%:*}"
   symbol="${check#*:}"
-  grep -q "$symbol" "$file" || die "Manual hook $symbol tidak ditemukan di $file."
+  grep -q "$symbol" "$file" || die "SUSFS hook $symbol tidak ditemukan di $file."
 done
 
 log "Generate ${CONFIG_NAME}"
@@ -112,8 +116,24 @@ make -s O="$OUT_DIR" ARCH=arm64 LLVM=1 LLVM_IAS=1 \
   CC=clang LD=ld.lld CROSS_COMPILE="$CROSS_COMPILE" \
   CROSS_COMPILE_ARM32="$CROSS_COMPILE_ARM32" "$CONFIG_NAME"
 
+scripts/config --file "$OUT_DIR/.config" \
+  --enable KSU_SUSFS \
+  --enable KSU_SUSFS_SUS_PATH \
+  --enable KSU_SUSFS_SUS_MOUNT \
+  --enable KSU_SUSFS_SUS_KSTAT \
+  --enable KSU_SUSFS_SUS_MAP \
+  --enable KSU_SUSFS_SPOOF_UNAME \
+  --enable KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG \
+  --enable KSU_SUSFS_OPEN_REDIRECT \
+  --enable KSU_SUSFS_ENABLE_LOG \
+  --enable KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS
+
+make -s O="$OUT_DIR" ARCH=arm64 LLVM=1 LLVM_IAS=1 \
+  CC=clang LD=ld.lld CROSS_COMPILE="$CROSS_COMPILE" \
+  CROSS_COMPILE_ARM32="$CROSS_COMPILE_ARM32" olddefconfig
+
 grep -q '^CONFIG_KSU=y$' "$OUT_DIR/.config" || die "CONFIG_KSU tidak aktif."
-grep -q '^CONFIG_KSU_MANUAL_HOOK=y$' "$OUT_DIR/.config" || die "CONFIG_KSU_MANUAL_HOOK tidak aktif."
+grep -q '^CONFIG_KSU_SUSFS=y$' "$OUT_DIR/.config" || die "CONFIG_KSU_SUSFS tidak aktif."
 grep -q '^CONFIG_NOMOUNT=y$' "$OUT_DIR/.config" || die "CONFIG_NOMOUNT tidak aktif."
 
 log "Build kernel with ${JOBS} jobs"
