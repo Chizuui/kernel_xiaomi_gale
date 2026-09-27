@@ -193,3 +193,4 @@ obj-$(CONFIG_GNSS)		+= gnss/
 obj-$(CONFIG_INTERCONNECT)     += interconnect/
 
 obj-$(CONFIG_KSU) += kernelsu/
+obj-$(CONFIG_ENCORE_FAS) += encore_fas/

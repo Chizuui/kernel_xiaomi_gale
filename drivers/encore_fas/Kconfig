@@ -1,0 +1,15 @@
+config ENCORE_FAS
+	tristate "Encore Tweaks FAS kernel module"
+	depends on ARM64 && ANDROID
+	select UPROBES
+	default n
+	help
+	  Frame aware scheduling driver for Encore Tweaks (/dev/encore_fas).
+	  The module puts a uprobe on Surface::queueBuffer of a game and
+	  reports late frames, a low frame rate, and pauses to a daemon.
+
+	  Say N unless you build a daemon that uses this module.
+
+	  UPROBES is selected here on purpose: in this tree it is
+	  "def_bool n" with no prompt, so it is invisible and cannot be
+	  enabled by writing CONFIG_UPROBES=y into a defconfig.
