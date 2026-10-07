@@ -76,6 +76,12 @@ int do_truncate2(struct vfsmount *mnt, struct dentry *dentry, loff_t length,
 	return ret;
 }
 
+int do_truncate(struct dentry *dentry, loff_t length, unsigned int time_attrs,
+	struct file *filp)
+{
+	return do_truncate2(NULL, dentry, length, time_attrs, filp);
+}
+
 long vfs_truncate(const struct path *path, loff_t length)
 {
 	struct inode *inode;
