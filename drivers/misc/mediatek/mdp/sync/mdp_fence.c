@@ -58,6 +58,12 @@ struct mdp_sync_create_fence_data {
 
 #define MDP_SYNC_IOC_INC	_IOW(MDP_SYNC_IOC_MAGIC, 1, __u32)
 
+/* FMT SYNC (MediaTek video encoder/decoder format sync) compatibility */
+#define FMT_SYNC_IOC_MAGIC	'f'
+#define FMT_SYNC_IOC_CREATE_FENCE	_IOWR(FMT_SYNC_IOC_MAGIC, 0,\
+		struct mdp_sync_create_fence_data)
+#define FMT_SYNC_IOC_INC	_IOW(FMT_SYNC_IOC_MAGIC, 1, __u32)
+
 /**
  * struct sync_timeline - sync object
  * @kref:		reference count on fence.
@@ -435,9 +441,11 @@ static long mdp_sync_ioctl(struct file *file, unsigned int cmd,
 
 	switch (cmd) {
 	case MDP_SYNC_IOC_CREATE_FENCE:
+	case FMT_SYNC_IOC_CREATE_FENCE:
 		return mdp_sync_ioctl_create_fence(obj, arg);
 
 	case MDP_SYNC_IOC_INC:
+	case FMT_SYNC_IOC_INC:
 		return mdp_sync_ioctl_inc(obj, arg);
 
 	default:
@@ -459,9 +467,25 @@ static struct miscdevice mdp_sync_dev = {
 	.fops	= &mdp_sync_fops,
 };
 
+static struct miscdevice fmt_sync_dev = {
+	.minor	= MISC_DYNAMIC_MINOR,
+	.name	= "fmt_sync",
+	.fops	= &mdp_sync_fops,
+};
+
 static int __init mdp_sync_device_init(void)
 {
-	return misc_register(&mdp_sync_dev);
+	int ret;
+
+	ret = misc_register(&mdp_sync_dev);
+	if (ret)
+		pr_err("%s: failed to register mdp_sync dev (%d)\n", __func__, ret);
+
+	ret = misc_register(&fmt_sync_dev);
+	if (ret)
+		pr_err("%s: failed to register fmt_sync dev (%d)\n", __func__, ret);
+
+	return 0;
 }
 device_initcall(mdp_sync_device_init);
 
