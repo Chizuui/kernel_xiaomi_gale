@@ -447,6 +447,7 @@ static struct miscdevice fmt_sync_dev = {
 	.minor	= MISC_DYNAMIC_MINOR,
 	.name	= "fmt_sync",
 	.fops	= &fmt_sync_fops,
+	.mode	= 0666,
 };
 
 static int __init fmt_sync_device_init(void)
