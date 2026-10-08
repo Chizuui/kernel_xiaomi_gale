@@ -465,12 +465,14 @@ static struct miscdevice mdp_sync_dev = {
 	.minor	= MISC_DYNAMIC_MINOR,
 	.name	= "mdp_sync",
 	.fops	= &mdp_sync_fops,
+	.mode	= 0666,
 };
 
 static struct miscdevice fmt_sync_dev = {
 	.minor	= MISC_DYNAMIC_MINOR,
 	.name	= "fmt_sync",
 	.fops	= &mdp_sync_fops,
+	.mode	= 0666,
 };
 
 static int __init mdp_sync_device_init(void)
