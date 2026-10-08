@@ -513,6 +513,11 @@ static int vidioc_venc_s_ctrl(struct v4l2_ctrl *ctrl)
 		p->refpfrmnum = ctrl->val;
 		ctx->param_change |= MTK_ENCODE_PARAM_REFP_FRMNUM;
 		break;
+	case V4L2_CID_MPEG_MTK_ENCODE_REFP_MAX_FRAME_NUM:
+		mtk_v4l2_debug(2,
+			"V4L2_CID_MPEG_MTK_ENCODE_REFP_MAX_FRAME_NUM: %d",
+			ctrl->val);
+		break;
 	case V4L2_CID_MPEG_MTK_LOG:
 		mtk_vcodec_set_log(ctx, ctrl->p_new.p_char);
 		break;
