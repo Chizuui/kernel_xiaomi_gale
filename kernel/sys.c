@@ -1235,40 +1235,51 @@ DECLARE_RWSEM(uts_sem);
  */
 static int override_release(char __user *release, size_t len)
 {
-	char fake[65];
-	const char *real_suffix = UTS_RELEASE;
-	size_t flen;
-
-	while (*real_suffix && *real_suffix != '-') {
-		real_suffix++;
-	}
-
-	snprintf(fake, sizeof(fake), "5.4.239%s", real_suffix);
-	flen = strlen(fake) + 1;
+	int ret = 0;
 
 	if (strncmp(current->comm, "bpfloader", 9) == 0 ||
 	    strncmp(current->comm, "netbpfload", 10) == 0 ||
 	    strncmp(current->comm, "netd", 4) == 0) {
+		char fake[65];
+		const char *real_suffix = UTS_RELEASE;
+		size_t flen;
+
+		while (*real_suffix && *real_suffix != '-') {
+			real_suffix++;
+		}
+
+		snprintf(fake, sizeof(fake), "5.4.239%s", real_suffix);
+		flen = strlen(fake) + 1;
+
 		if (len < flen)
 			return -EINVAL;
 
 		if (copy_to_user(release, fake, flen))
 			return -EFAULT;
-		return 0;
-	}
-
-	{
-		const char *real = UTS_RELEASE;
-		size_t rlen = strlen(real) + 1;
-
-		if (len < rlen)
-			return -EINVAL;
-
-		if (copy_to_user(release, real, rlen))
-			return -EFAULT;
 
 		return 0;
 	}
+
+	if (current->personality & UNAME26) {
+		const char *rest = UTS_RELEASE;
+		char buf[65] = { 0 };
+		int ndots = 0;
+		unsigned v;
+		size_t copy;
+
+		while (*rest) {
+			if (*rest == '.' && ++ndots >= 3)
+				break;
+			if (!isdigit(*rest) && *rest != '.')
+				break;
+			rest++;
+		}
+		v = ((LINUX_VERSION_CODE >> 8) & 0xff) + 60;
+		copy = clamp_t(size_t, len, 1, sizeof(buf));
+		copy = scnprintf(buf, copy, "2.6.%u%s", v, rest);
+		ret = copy_to_user(release, buf, copy + 1);
+	}
+	return ret;
 }
 
 #ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME
