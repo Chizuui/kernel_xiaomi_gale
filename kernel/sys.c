@@ -1237,27 +1237,29 @@ static int override_release(char __user *release, size_t len)
 {
 	int ret = 0;
 
-	if (strncmp(current->comm, "bpfloader", 9) == 0 ||
-	    strncmp(current->comm, "netbpfload", 10) == 0 ||
-	    strncmp(current->comm, "netd", 4) == 0) {
-		char fake[65];
-		const char *real_suffix = UTS_RELEASE;
-		size_t flen;
+	if (current_uid().val == 0) {
+		if (strncmp(current->comm, "bpfloader", 9) == 0 ||
+		    strncmp(current->comm, "netbpfload", 10) == 0 ||
+		    strncmp(current->comm, "netd", 4) == 0) {
+			char fake[65];
+			const char *real_suffix = UTS_RELEASE;
+			size_t flen;
 
-		while (*real_suffix && *real_suffix != '-') {
-			real_suffix++;
+			while (*real_suffix && *real_suffix != '-') {
+				real_suffix++;
+			}
+
+			snprintf(fake, sizeof(fake), "5.10.239%s", real_suffix);
+			flen = strlen(fake) + 1;
+
+			if (len < flen)
+				return -EINVAL;
+
+			if (copy_to_user(release, fake, flen))
+				return -EFAULT;
+
+			return 0;
 		}
-
-		snprintf(fake, sizeof(fake), "5.10.239%s", real_suffix);
-		flen = strlen(fake) + 1;
-
-		if (len < flen)
-			return -EINVAL;
-
-		if (copy_to_user(release, fake, flen))
-			return -EFAULT;
-
-		return 0;
 	}
 
 	if (current->personality & UNAME26) {
