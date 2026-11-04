@@ -1,0 +1,111 @@
+name: Build Kernel
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          repository: xxblebleblexx/android_kernel_xiaomi_gale
+          ref: refactor
+          fetch-depth: 1
+
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison flex build-essential cpio libssl-dev libelf-dev \
+            libdw-dev libncurses-dev dwarves pahole rsync zip unzip python3 wget curl git \
+            gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
+            gcc-arm-linux-gnueabi binutils-arm-linux-gnueabi
+
+      - name: Setup Neutron Clang
+        run: |
+          mkdir -p ~/toolchains/neutron-clang
+          cd ~/toolchains/neutron-clang
+          curl -fL https://raw.githubusercontent.com/Neutron-Toolchains/antman/main/antman -o antman
+          chmod +x antman
+          ./antman -S=06092026
+          ./antman --patch=glibc
+          echo "$HOME/toolchains/neutron-clang/bin" >> "$GITHUB_PATH"
+
+      - name: Check toolchain
+        run: |
+          clang --version
+          ld.lld --version
+          aarch64-linux-gnu-gcc --version
+
+      - name: Make config
+        run: |
+          export ARCH=arm64
+          export PATH="$HOME/toolchains/neutron-clang/bin:$PATH"
+          export LLVM=1 LLVM_IAS=1
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
+          mkdir -p out
+          make O=out ARCH=arm64 gale_defconfig
+          make O=out ARCH=arm64 olddefconfig
+          make O=out ARCH=arm64 kernelrelease
+          grep '^CONFIG_LOCALVERSION=' out/.config
+
+      - name: Build
+        run: |
+          export ARCH=arm64
+          export PATH="$HOME/toolchains/neutron-clang/bin:$PATH"
+          export LLVM=1 LLVM_IAS=1
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
+          make -j$(nproc) O=out ARCH=arm64 Image.gz dtbs
+
+      - name: Check build output
+        run: |
+          test -f out/arch/arm64/boot/Image.gz
+          ls -lh out/arch/arm64/boot/Image.gz
+          find out/arch/arm64/boot/dts -type f -name "*.dtb" -print
+          make -s O=out ARCH=arm64 kernelrelease
+
+      - name: Clone AnyKernel3
+        run: git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git AnyKernel3
+
+      - name: Package
+        run: |
+          cat > AnyKernel3/anykernel.sh <<'EOF'
+          properties() { '
+          kernel.string=MyKernel
+          do.devicecheck=1
+          do.modules=0
+          do.systemless=1
+          do.cleanup=1
+          do.cleanuponabort=0
+          device.name1=gale
+          device.name2=gust
+          '; }
+          BLOCK=/dev/block/by-name/boot;
+          IS_SLOT_DEVICE=1;
+          RAMDISK_COMPRESSION=auto;
+          PATCH_VBMETA_FLAG=auto;
+          . tools/ak3-core.sh;
+          dump_boot;
+          flash_boot;
+          EOF
+          cp out/arch/arm64/boot/Image.gz AnyKernel3/Image.gz
+          find out/arch/arm64/boot/dts -type f -name "*.dtb" -exec cp {} AnyKernel3/dtb \;
+          mkdir -p AnyKernel3/modules AnyKernel3/patch AnyKernel3/ramdisk
+          touch AnyKernel3/modules/.placeholder AnyKernel3/patch/.placeholder AnyKernel3/ramdisk/.placeholder
+          cd AnyKernel3
+          rm -rf .git .github LICENSE README.md
+          zip -r9 ../MyKernel-gale.zip . -x '*.git*' -x 'README.md' -x 'LICENSE'
+          cd ..
+          test -f MyKernel-gale.zip
+          ls -lh MyKernel-gale.zip
+          unzip -t MyKernel-gale.zip
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: MyKernel-gale
+          path: MyKernel-gale.zip
+          if-no-files-found: error
